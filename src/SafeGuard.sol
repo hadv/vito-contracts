@@ -9,7 +9,7 @@ contract SafeGuard is BaseGuard {
     address public immutable owner;
 
     error OnlyOwner();
-    error CallRestricted();
+    error DelegateCallRestricted();
 
     event TargetAllowed(address indexed target);
     event TargetDisallowed(address indexed target);
@@ -24,17 +24,17 @@ contract SafeGuard is BaseGuard {
     }
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
+        if (msg.sender != owner && msg.sender != address(this)) revert OnlyOwner();
         _;
     }
 
-    function addAllowedTarget(address target) external onlyOwner {
+    function addAllowedTarget(address target) public onlyOwner {
         require(target != address(0), "Invalid target address");
         allowedTargets[target] = true;
         emit TargetAllowed(target);
     }
 
-    function removeAllowedTarget(address target) external onlyOwner {
+    function removeAllowedTarget(address target) public onlyOwner {
         allowedTargets[target] = false;
         emit TargetDisallowed(target);
     }
@@ -54,7 +54,7 @@ contract SafeGuard is BaseGuard {
         bytes memory,
         address
     ) external view override {
-        if (operation == Enum.Operation.DelegateCall && !allowedTargets[to]) revert CallRestricted();
+        if (operation == Enum.Operation.DelegateCall && !allowedTargets[to]) revert DelegateCallRestricted();
     }
 
     // This function is called by the Safe contract after a transaction is executed.

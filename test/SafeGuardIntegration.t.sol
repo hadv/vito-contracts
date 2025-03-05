@@ -9,23 +9,7 @@ import {Safe} from "@safe-global/safe-contracts/contracts/Safe.sol";
 import {SafeProxyFactory} from "@safe-global/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import {SafeProxy} from "@safe-global/safe-contracts/contracts/proxies/SafeProxy.sol";
 import {GuardManager} from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
-
-// Mock contract for delegate call testing
-contract MockTarget {
-    function delegateCallMe() external pure returns (bool) {
-        return true;
-    }
-
-    // Receive function to handle ETH transfers
-    receive() external payable {
-        // Do nothing, just accept ETH
-    }
-
-    // Fallback function to handle all other calls
-    fallback() external payable {
-        // Do nothing, just accept the call
-    }
-}
+import {MockTarget} from "./mocks/MockTarget.sol";
 
 contract SafeGuardIntegrationTest is Test {
     SafeGuard public guard;
@@ -35,10 +19,6 @@ contract SafeGuardIntegrationTest is Test {
     address public owner;
     address public unauthorizedTarget;
     uint256 public ownerKey;
-
-    // Error selectors
-    bytes4 constant CALL_RESTRICTED_SELECTOR = bytes4(keccak256("CallRestricted()"));
-    bytes4 constant ONLY_OWNER_SELECTOR = bytes4(keccak256("OnlyOwner()"));
 
     function setUp() public {
         // Setup owner
@@ -68,7 +48,7 @@ contract SafeGuardIntegrationTest is Test {
             1, // threshold
             address(0), // to
             "", // data
-            address(0), // fallbackHandler
+            address(guard), // fallbackHandler
             address(0), // paymentToken
             0, // payment
             payable(address(0)) // paymentReceiver
@@ -204,12 +184,12 @@ contract SafeGuardIntegrationTest is Test {
 
         // Try to add target from unauthorized address
         vm.prank(makeAddr("unauthorized"));
-        vm.expectRevert(abi.encodeWithSelector(ONLY_OWNER_SELECTOR));
+        vm.expectRevert(abi.encodeWithSelector(SafeGuard.OnlyOwner.selector));
         guard.addAllowedTarget(newTarget);
 
         // Try to remove target from unauthorized address
         vm.prank(makeAddr("unauthorized"));
-        vm.expectRevert(abi.encodeWithSelector(ONLY_OWNER_SELECTOR));
+        vm.expectRevert(abi.encodeWithSelector(SafeGuard.OnlyOwner.selector));
         guard.removeAllowedTarget(address(mockTarget));
     }
 }
