@@ -1,66 +1,77 @@
-## Foundry
+# Safe Guard Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repository contains smart contracts for Safe Guard implementation, which provides delegate call restrictions for Safe multisig wallets.
 
-Foundry consists of:
+## Overview
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The SafeGuard contract is a guard implementation for the Safe (formerly Gnosis Safe) smart contract wallet. It restricts delegate calls to only allowed target addresses, providing an additional layer of security.
 
-## Documentation
+## Development
 
-https://book.getfoundry.sh/
+This project uses [Foundry](https://github.com/foundry-rs/foundry) for development and testing.
 
-## Usage
+### Install Dependencies
 
-### Build
-
-```shell
-$ forge build
+```bash
+forge install
 ```
 
-### Test
+### Run Tests
 
-```shell
-$ forge test
+```bash
+forge test
 ```
 
-### Format
+### Run Tests with Coverage
 
-```shell
-$ forge fmt
+```bash
+forge coverage
 ```
 
-### Gas Snapshots
+## Deployment Guide
 
-```shell
-$ forge snapshot
+### 1. Environment Setup
+
+First, create a `.env` file from the example:
+
+```bash
+cp .env.example .env
 ```
 
-### Anvil
-
-```shell
-$ anvil
+Edit `.env` with your values:
+```
+PRIVATE_KEY=your_private_key_without_0x
+RPC_URL=your_rpc_url
 ```
 
-### Deploy
+### 2. Deploy Contract
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+Source the environment variables and run the deployment script:
+
+```bash
+source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-url $RPC_URL --broadcast -vvvv
 ```
 
-### Cast
+#### Optional Deployment Flags
 
-```shell
-$ cast <subcommand>
+- `--verify`: Verify contract on Etherscan
+- `--chain-id <id>`: Specify network chain ID
+- `--gas-price <price>`: Set specific gas price
+- `--legacy`: For networks not supporting EIP-1559
+
+#### Example: Deploy to Sepolia
+
+```bash
+source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-url $RPC_URL --broadcast --chain-id 11155111 -vvvv
 ```
 
-### Help
+## Contract Usage
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+After deployment, the SafeGuard can be:
+1. Set as a guard on a Safe wallet
+2. Configured with allowed target addresses for delegate calls
+3. Managed by the owner to add/remove allowed targets
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
