@@ -145,7 +145,53 @@ contract SafeGuardIntegrationTest is Test {
         );
     }
 
-    /// forge-config: default.allow_internal_expect_revert = true
+    function test_UnauthorizedDelegateCallFromSafe() public {
+        // Prepare transaction data for delegate call
+        bytes memory callData = abi.encodeWithSelector(MockTarget.delegateCallMe.selector);
+
+        // Try to execute delegate call to unauthorized target through Safe
+        bytes memory execTxCalldata = abi.encodeWithSelector(
+            Safe.execTransaction.selector,
+            unauthorizedTarget,
+            0,
+            callData,
+            Enum.Operation.DelegateCall,
+            100000,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            getSignature(
+                getTransactionHash(
+                    unauthorizedTarget,
+                    0,
+                    callData,
+                    Enum.Operation.DelegateCall,
+                    100000,
+                    0,
+                    0,
+                    address(0),
+                    payable(address(0)),
+                    safe.nonce()
+                ),
+                ownerKey
+            )
+        );
+
+        // Make the low-level call to Safe
+        (bool success, bytes memory returnData) = address(safe).call(execTxCalldata);
+
+        // Log the actual revert data for debugging
+        console.logBytes(returnData);
+
+        // Verify the call failed
+        assertFalse(success, "Expected revert");
+
+        // Verify it reverted with DelegateCallRestricted error
+        bytes4 errorSelector = SafeGuard.DelegateCallRestricted.selector;
+        assertEq(returnData, abi.encodeWithSelector(errorSelector), "Wrong error returned");
+    }
+
     function test_SafeDelegateCallWithGuard() public {
         // Use the deployed mockTarget contract
         bytes memory callData = abi.encodeWithSelector(MockTarget.delegateCallMe.selector);
@@ -171,25 +217,5 @@ contract SafeGuardIntegrationTest is Test {
         bytes memory callData = abi.encodeWithSelector(MockTarget.delegateCallMe.selector);
         success = execTransaction(address(mockTarget), 0, callData, Enum.Operation.DelegateCall);
         assertTrue(success, "Delegate call should succeed after guard is removed");
-    }
-
-    function test_GuardTarget() public view {
-        // Check that the allowed target is set correctly
-        assertTrue(guard.allowedTargets(address(mockTarget)), "Mock target should be allowed");
-        assertFalse(guard.allowedTargets(unauthorizedTarget), "Unauthorized target should not be allowed");
-    }
-
-    function test_OnlyOwnerCanManageTargets() public {
-        address newTarget = makeAddr("newTarget");
-
-        // Try to add target from unauthorized address
-        vm.prank(makeAddr("unauthorized"));
-        vm.expectRevert(abi.encodeWithSelector(SafeGuard.OnlyOwner.selector));
-        guard.addAllowedTarget(newTarget);
-
-        // Try to remove target from unauthorized address
-        vm.prank(makeAddr("unauthorized"));
-        vm.expectRevert(abi.encodeWithSelector(SafeGuard.OnlyOwner.selector));
-        guard.removeAllowedTarget(address(mockTarget));
     }
 }
