@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import { Enum } from "@safe-global/safe-contracts/contracts/common/Enum.sol";
-import { BaseGuard } from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
+import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
+import {BaseGuard} from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
 
 contract SafeGuard is BaseGuard {
     mapping(address => bool) public allowedTargets;
@@ -66,4 +66,4 @@ contract SafeGuard is BaseGuard {
     fallback() external {
         // We do not want to revert here to prevent the Safe from being locked during upgrades
     }
-} 
+}

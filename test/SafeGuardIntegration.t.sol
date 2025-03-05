@@ -60,7 +60,7 @@ contract SafeGuardIntegrationTest is Test {
         // Setup Safe wallet with single owner
         address[] memory owners = new address[](1);
         owners[0] = owner;
-        
+
         // Deploy Safe with 1/1 threshold and guard
         bytes memory safeSetupData = abi.encodeWithSelector(
             Safe.setup.selector,
@@ -74,11 +74,7 @@ contract SafeGuardIntegrationTest is Test {
             payable(address(0)) // paymentReceiver
         );
 
-        SafeProxy proxy = factory.createProxyWithNonce(
-            address(new Safe()),
-            safeSetupData,
-            0
-        );
+        SafeProxy proxy = factory.createProxyWithNonce(address(new Safe()), safeSetupData, 0);
 
         safe = Safe(payable(address(proxy)));
 
@@ -86,10 +82,7 @@ contract SafeGuardIntegrationTest is Test {
         vm.deal(address(safe), 1 ether);
 
         // Set guard on Safe through a transaction
-        bytes memory setGuardData = abi.encodeWithSelector(
-            GuardManager.setGuard.selector,
-            address(guard)
-        );
+        bytes memory setGuardData = abi.encodeWithSelector(GuardManager.setGuard.selector, address(guard));
         execTransaction(address(safe), 0, setGuardData, Enum.Operation.Call);
     }
 
@@ -131,20 +124,15 @@ contract SafeGuardIntegrationTest is Test {
         );
     }
 
-    function getSignature(
-        bytes32 txHash,
-        uint256 key
-    ) internal pure returns (bytes memory) {
+    function getSignature(bytes32 txHash, uint256 key) internal pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, txHash);
         return abi.encodePacked(r, s, v);
     }
 
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) internal returns (bool) {
+    function execTransaction(address to, uint256 value, bytes memory data, Enum.Operation operation)
+        internal
+        returns (bool)
+    {
         // Get transaction hash
         bytes32 txHash = getTransactionHash(
             to,
@@ -195,10 +183,7 @@ contract SafeGuardIntegrationTest is Test {
 
     function test_GuardCanBeRemovedFromSafe() public {
         // Remove guard from Safe through a transaction
-        bytes memory setGuardData = abi.encodeWithSelector(
-            GuardManager.setGuard.selector,
-            address(0)
-        );
+        bytes memory setGuardData = abi.encodeWithSelector(GuardManager.setGuard.selector, address(0));
         bool success = execTransaction(address(safe), 0, setGuardData, Enum.Operation.Call);
         assertTrue(success, "Guard should be removed successfully");
 
@@ -216,7 +201,7 @@ contract SafeGuardIntegrationTest is Test {
 
     function test_OnlyOwnerCanManageTargets() public {
         address newTarget = makeAddr("newTarget");
-        
+
         // Try to add target from unauthorized address
         vm.prank(makeAddr("unauthorized"));
         vm.expectRevert(abi.encodeWithSelector(ONLY_OWNER_SELECTOR));
@@ -227,4 +212,4 @@ contract SafeGuardIntegrationTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ONLY_OWNER_SELECTOR));
         guard.removeAllowedTarget(address(mockTarget));
     }
-} 
+}
