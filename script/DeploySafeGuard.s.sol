@@ -8,7 +8,7 @@ contract DeploySafeGuard is Script {
     function run() external returns (SafeGuard) {
         // Get deployer's private key from environment variable
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        
+
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
@@ -22,4 +22,4 @@ contract DeploySafeGuard is Script {
 
         return guard;
     }
-} 
+}
