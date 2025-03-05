@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {SafeGuard} from "../src/SafeGuard.sol";
 import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
