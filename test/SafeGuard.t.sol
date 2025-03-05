@@ -35,7 +35,7 @@ contract SafeGuardTest is Test {
     function test_CheckTransactionDelegateCall() public {
         // Prepare transaction data
         bytes memory data = abi.encodeWithSelector(bytes4(0), ADDRESS_ZERO);
-        
+
         // Attempt delegate call to unauthorized target should revert
         vm.expectRevert(CALL_RESTRICTED_SELECTOR);
         guard.checkTransaction(
@@ -71,7 +71,7 @@ contract SafeGuardTest is Test {
     function test_CheckTransactionNormalCall() public view {
         // Prepare transaction data
         bytes memory data = abi.encodeWithSelector(bytes4(0), ADDRESS_ZERO);
-        
+
         // Normal call should not revert
         guard.checkTransaction(
             ADDRESS_ZERO, // to
@@ -96,7 +96,7 @@ contract SafeGuardTest is Test {
 
     function test_AddAllowedTarget() public {
         address newTarget = makeAddr("newTarget");
-        
+
         // Add new target
         guard.addAllowedTarget(newTarget);
 
@@ -128,4 +128,4 @@ contract SafeGuardTest is Test {
             address(this) // msgSender
         );
     }
-} 
+}

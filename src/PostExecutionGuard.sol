@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import { Enum } from "@safe-global/safe-contracts/contracts/common/Enum.sol";
-import { BaseGuard } from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
+import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
+import {BaseGuard} from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
 
 contract PostExecutionGuard is BaseGuard {
     // Address of the contract to check after execution
     address public immutable targetContract;
-    
+
     // Event to emit when post-execution check fails
-    event PostExecutionCheckFailed(
-        address indexed target,
-        uint256 value,
-        bytes data,
-        Enum.Operation operation
-    );
+    event PostExecutionCheckFailed(address indexed target, uint256 value, bytes data, Enum.Operation operation);
 
     constructor(address _targetContract) {
         require(_targetContract != address(0), "Invalid target contract");
@@ -55,4 +50,4 @@ contract PostExecutionGuard is BaseGuard {
     fallback() external {
         // We do not want to revert here to prevent the Safe from being locked during upgrades
     }
-} 
+}
