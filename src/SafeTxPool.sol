@@ -180,27 +180,57 @@ contract SafeTxPool {
     }
 
     /**
-     * @notice Get all pending transaction hashes for a Safe
+     * @notice Get a range of pending transaction hashes for a Safe
      * @param safe The Safe wallet address
+     * @param offset Starting index of the range (0-based)
+     * @param limit Maximum number of transactions to return
      * @return Array of pending transaction hashes
      */
-    function getPendingTxHashes(address safe) external view returns (bytes32[] memory) {
-        return pendingTxsBySafe[safe];
+    function getPendingTxHashes(address safe, uint256 offset, uint256 limit) external view returns (bytes32[] memory) {
+        bytes32[] storage allPendingTxs = pendingTxsBySafe[safe];
+        uint256 totalLength = allPendingTxs.length;
+
+        // If offset is beyond array length, return empty array
+        if (offset >= totalLength) {
+            return new bytes32[](0);
+        }
+
+        // Calculate actual limit to avoid out of bounds
+        uint256 actualLimit = limit;
+        if (offset + limit > totalLength) {
+            actualLimit = totalLength - offset;
+        }
+
+        // Create new array with the correct size
+        bytes32[] memory result = new bytes32[](actualLimit);
+
+        // Copy the requested range
+        for (uint256 i = 0; i < actualLimit; i++) {
+            result[i] = allPendingTxs[offset + i];
+        }
+
+        return result;
     }
 
     /**
-     * @notice Remove a transaction from pending list for a Safe
+     * @notice Remove a transaction and all transactions with the same nonce from pending list for a Safe
      * @param safe The Safe wallet address
      * @param txHash Hash of the transaction to remove
      */
     function _removeFromPending(address safe, bytes32 txHash) internal {
         bytes32[] storage pendingTxs = pendingTxsBySafe[safe];
-        for (uint256 i = 0; i < pendingTxs.length; i++) {
-            if (pendingTxs[i] == txHash) {
+        uint256 targetNonce = transactions[txHash].nonce;
+
+        // Iterate through pending transactions from end to start to handle removals safely
+        for (uint256 i = pendingTxs.length; i > 0; i--) {
+            uint256 currentIndex = i - 1;
+            bytes32 currentTxHash = pendingTxs[currentIndex];
+
+            // Check if current transaction has the same nonce
+            if (transactions[currentTxHash].nonce == targetNonce) {
                 // Move last element to current position and pop
-                pendingTxs[i] = pendingTxs[pendingTxs.length - 1];
+                pendingTxs[currentIndex] = pendingTxs[pendingTxs.length - 1];
                 pendingTxs.pop();
-                break;
             }
         }
     }

@@ -64,7 +64,7 @@ contract SafeTxPoolTest is Test {
         assertEq(txNonce, 0);
 
         // Verify pending transactions for this Safe
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe);
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 1);
         assertEq(pendingTxs.length, 1);
         assertEq(pendingTxs[0], txHash);
     }
@@ -105,7 +105,7 @@ contract SafeTxPoolTest is Test {
         pool.markAsExecuted(txHash);
 
         // Verify removed from pending
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe);
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 1);
         assertEq(pendingTxs.length, 0);
     }
 
@@ -179,8 +179,8 @@ contract SafeTxPoolTest is Test {
         pool.proposeTx(txHash2, safe2, recipient, 0, data2, Enum.Operation.Call, 0);
 
         // Verify pending transactions for each Safe
-        bytes32[] memory pendingTxs1 = pool.getPendingTxHashes(safe);
-        bytes32[] memory pendingTxs2 = pool.getPendingTxHashes(safe2);
+        bytes32[] memory pendingTxs1 = pool.getPendingTxHashes(safe, 0, 1);
+        bytes32[] memory pendingTxs2 = pool.getPendingTxHashes(safe2, 0, 1);
 
         assertEq(pendingTxs1.length, 1);
         assertEq(pendingTxs2.length, 1);
@@ -201,7 +201,7 @@ contract SafeTxPoolTest is Test {
         pool.deleteTx(txHash);
 
         // Verify removed from pending
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe);
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 1);
         assertEq(pendingTxs.length, 0);
     }
 
@@ -225,5 +225,107 @@ contract SafeTxPoolTest is Test {
         vm.prank(owner1);
         vm.expectRevert(SafeTxPool.TransactionNotFound.selector);
         pool.deleteTx(txHash);
+    }
+
+    function testGetPendingTxHashesPagination() public {
+        // Create multiple transactions
+        bytes32[] memory txHashes = new bytes32[](5);
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        for (uint256 i = 0; i < 5; i++) {
+            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
+            vm.prank(owner1);
+            pool.proposeTx(txHashes[i], safe, recipient, 0, data, Enum.Operation.Call, i);
+        }
+
+        // Test first page (2 items)
+        bytes32[] memory firstPage = pool.getPendingTxHashes(safe, 0, 2);
+        assertEq(firstPage.length, 2);
+        assertEq(firstPage[0], txHashes[0]);
+        assertEq(firstPage[1], txHashes[1]);
+
+        // Test second page (2 items)
+        bytes32[] memory secondPage = pool.getPendingTxHashes(safe, 2, 2);
+        assertEq(secondPage.length, 2);
+        assertEq(secondPage[0], txHashes[2]);
+        assertEq(secondPage[1], txHashes[3]);
+
+        // Test last page (1 item)
+        bytes32[] memory lastPage = pool.getPendingTxHashes(safe, 4, 2);
+        assertEq(lastPage.length, 1);
+        assertEq(lastPage[0], txHashes[4]);
+
+        // Test empty page (beyond array length)
+        bytes32[] memory emptyPage = pool.getPendingTxHashes(safe, 5, 2);
+        assertEq(emptyPage.length, 0);
+
+        // Test partial last page
+        bytes32[] memory partialPage = pool.getPendingTxHashes(safe, 3, 3);
+        assertEq(partialPage.length, 2);
+        assertEq(partialPage[0], txHashes[3]);
+        assertEq(partialPage[1], txHashes[4]);
+    }
+
+    function testGetPendingTxHashesPaginationWithExecutedTx() public {
+        // Create multiple transactions
+        bytes32[] memory txHashes = new bytes32[](3);
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        for (uint256 i = 0; i < 3; i++) {
+            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
+            vm.prank(owner1);
+            pool.proposeTx(txHashes[i], safe, recipient, 0, data, Enum.Operation.Call, i);
+        }
+
+        // Execute middle transaction
+        vm.prank(safe);
+        pool.markAsExecuted(txHashes[1]);
+
+        // Test pagination after execution
+        bytes32[] memory firstPage = pool.getPendingTxHashes(safe, 0, 2);
+        assertEq(firstPage.length, 2);
+        assertEq(firstPage[0], txHashes[0]);
+        assertEq(firstPage[1], txHashes[2]);
+
+        // Test second page (should be empty)
+        bytes32[] memory secondPage = pool.getPendingTxHashes(safe, 2, 2);
+        assertEq(secondPage.length, 0);
+    }
+
+    function testGetPendingTxHashesPaginationWithMultipleSafes() public {
+        // Create another Safe
+        address safe2 = address(0x8765);
+
+        // Create transactions for first Safe
+        bytes32[] memory txHashes1 = new bytes32[](3);
+        bytes memory data1 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        for (uint256 i = 0; i < 3; i++) {
+            txHashes1[i] = keccak256(abi.encodePacked("test transaction 1", i));
+            vm.prank(owner1);
+            pool.proposeTx(txHashes1[i], safe, recipient, 0, data1, Enum.Operation.Call, i);
+        }
+
+        // Create transactions for second Safe
+        bytes32[] memory txHashes2 = new bytes32[](2);
+        bytes memory data2 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 200 ether);
+
+        for (uint256 i = 0; i < 2; i++) {
+            txHashes2[i] = keccak256(abi.encodePacked("test transaction 2", i));
+            vm.prank(owner2);
+            pool.proposeTx(txHashes2[i], safe2, recipient, 0, data2, Enum.Operation.Call, i);
+        }
+
+        // Test pagination for first Safe
+        bytes32[] memory firstPage1 = pool.getPendingTxHashes(safe, 0, 2);
+        assertEq(firstPage1.length, 2);
+        assertEq(firstPage1[0], txHashes1[0]);
+        assertEq(firstPage1[1], txHashes1[1]);
+
+        // Test pagination for second Safe
+        bytes32[] memory firstPage2 = pool.getPendingTxHashes(safe2, 0, 2);
+        assertEq(firstPage2.length, 2);
+        assertEq(firstPage2[0], txHashes2[0]);
+        assertEq(firstPage2[1], txHashes2[1]);
     }
 }
