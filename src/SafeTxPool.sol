@@ -268,12 +268,24 @@ contract SafeTxPool {
         // Check if caller is the proposer
         if (msg.sender != safeTx.proposer) revert NotProposer();
 
-        // Remove from pending transactions for this Safe
-        _removeFromPending(safeTx.safe, txHash);
+        // Get Safe address before deletion
+        address safe = safeTx.safe;
+
+        // Remove specific transaction from pending list
+        bytes32[] storage pendingTxs = pendingTxsBySafe[safe];
+        for (uint256 i = pendingTxs.length; i > 0; i--) {
+            uint256 currentIndex = i - 1;
+            if (pendingTxs[currentIndex] == txHash) {
+                // Move last element to current position and pop
+                pendingTxs[currentIndex] = pendingTxs[pendingTxs.length - 1];
+                pendingTxs.pop();
+                break;
+            }
+        }
 
         // Delete transaction data
         delete transactions[txHash];
 
-        emit TransactionDeleted(txHash, safeTx.safe, msg.sender);
+        emit TransactionDeleted(txHash, safe, msg.sender);
     }
 }
