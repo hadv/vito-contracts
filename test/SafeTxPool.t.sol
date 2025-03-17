@@ -6,6 +6,8 @@ import {SafeTxPool} from "../src/SafeTxPool.sol";
 import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 contract SafeTxPoolTest is Test {
+    event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer);
+
     SafeTxPool public pool;
     address public safe;
     address public owner1;
@@ -327,5 +329,97 @@ contract SafeTxPoolTest is Test {
         assertEq(firstPage2.length, 2);
         assertEq(firstPage2[0], txHashes2[0]);
         assertEq(firstPage2[1], txHashes2[1]);
+    }
+
+    function testDeleteTxKeepsSameNonceTxs() public {
+        // Prepare and propose first transaction
+        bytes32 txHash1 = keccak256("test transaction 1");
+        bytes memory data1 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        vm.prank(owner1);
+        pool.proposeTx(txHash1, safe, recipient, 0, data1, Enum.Operation.Call, 1); // nonce 1
+
+        // Prepare and propose second transaction with same nonce
+        bytes32 txHash2 = keccak256("test transaction 2");
+        bytes memory data2 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 200 ether);
+
+        vm.prank(owner2);
+        pool.proposeTx(txHash2, safe, recipient, 0, data2, Enum.Operation.Call, 1); // same nonce 1
+
+        // Delete first transaction
+        vm.prank(owner1);
+        vm.expectEmit(true, true, true, true);
+        emit TransactionDeleted(txHash1, safe, owner1);
+        pool.deleteTx(txHash1);
+
+        // Verify second transaction still exists
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 2);
+        assertEq(pendingTxs.length, 1);
+        assertEq(pendingTxs[0], txHash2);
+
+        // Verify first transaction data is deleted
+        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHash1);
+        assertEq(txProposer, address(0));
+        assertEq(txSafe, address(0));
+
+        // Verify second transaction data is intact
+        (address safe_,,,,, address proposer_, uint256 nonce_) = pool.getTxDetails(txHash2);
+        assertEq(proposer_, owner2);
+        assertEq(safe_, safe);
+        assertEq(nonce_, 1);
+    }
+
+    function testDeleteTxWithMultiplePendingTxs() public {
+        // Propose multiple transactions with different nonces
+        bytes32[] memory txHashes = new bytes32[](3);
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        for (uint256 i = 0; i < 3; i++) {
+            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
+            vm.prank(owner1);
+            pool.proposeTx(txHashes[i], safe, recipient, 0, data, Enum.Operation.Call, i);
+        }
+
+        // Delete middle transaction
+        vm.prank(owner1);
+        pool.deleteTx(txHashes[1]);
+
+        // Verify remaining transactions
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 3);
+        assertEq(pendingTxs.length, 2);
+        assertEq(pendingTxs[0], txHashes[0]);
+        assertEq(pendingTxs[1], txHashes[2]);
+
+        // Verify middle transaction is properly deleted
+        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHashes[1]);
+        assertEq(txProposer, address(0));
+        assertEq(txSafe, address(0));
+    }
+
+    function testDeleteLastPendingTx() public {
+        // Propose multiple transactions
+        bytes32[] memory txHashes = new bytes32[](3);
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        for (uint256 i = 0; i < 3; i++) {
+            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
+            vm.prank(owner1);
+            pool.proposeTx(txHashes[i], safe, recipient, 0, data, Enum.Operation.Call, i);
+        }
+
+        // Delete last transaction
+        vm.prank(owner1);
+        pool.deleteTx(txHashes[2]);
+
+        // Verify remaining transactions
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 3);
+        assertEq(pendingTxs.length, 2);
+        assertEq(pendingTxs[0], txHashes[0]);
+        assertEq(pendingTxs[1], txHashes[1]);
+
+        // Try to get details of deleted transaction
+        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHashes[2]);
+        assertEq(txProposer, address(0));
+        assertEq(txSafe, address(0));
     }
 }
