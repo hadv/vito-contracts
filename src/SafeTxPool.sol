@@ -320,7 +320,7 @@ contract SafeTxPool is BaseGuard {
     function checkAfterExecution(bytes32 txHash, bool success) external override {
         // Only proceed if transaction was successful
         if (!success) return;
-        
+
         // Since the transaction hash is the same in the pool and in the Safe,
         // we can directly try to mark the transaction as executed
         if (transactions[txHash].proposer != address(0)) {
