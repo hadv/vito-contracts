@@ -2,8 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
+import {BaseGuard} from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
 
-contract SafeTxPool {
+contract SafeTxPool is BaseGuard {
     // Struct to hold transaction details
     struct SafeTx {
         address safe;
@@ -120,8 +121,8 @@ contract SafeTxPool {
         // Check if transaction exists
         if (safeTx.proposer == address(0)) revert TransactionNotFound();
 
-        // Check if caller is the Safe wallet
-        if (msg.sender != safeTx.safe) revert NotSafeWallet();
+        // Check if caller is the Safe wallet or this contract (when called from checkAfterExecution)
+        if (msg.sender != safeTx.safe && msg.sender != address(this)) revert NotSafeWallet();
 
         // Remove from pending transactions for this Safe
         _removeFromPending(safeTx.safe, txHash);
@@ -129,7 +130,7 @@ contract SafeTxPool {
         // Delete transaction data
         delete transactions[txHash];
 
-        emit TransactionExecuted(txHash, msg.sender);
+        emit TransactionExecuted(txHash, safeTx.safe);
     }
 
     /**
@@ -287,5 +288,51 @@ contract SafeTxPool {
         delete transactions[txHash];
 
         emit TransactionDeleted(txHash, safe, msg.sender);
+    }
+
+    /**
+     * @notice Implementation of the Guard interface's checkTransaction function
+     * @dev This function is called before a Safe transaction is executed
+     */
+    function checkTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory signatures,
+        address msgSender
+    ) external view override {
+        // No pre-execution checks needed
+        // This guard focuses on post-execution
+    }
+
+    /**
+     * @notice Implementation of the Guard interface's checkAfterExecution function
+     * @dev This function is called after a Safe transaction is executed
+     * @param txHash Hash of the Safe transaction
+     * @param success Whether the transaction was successful
+     */
+    function checkAfterExecution(bytes32 txHash, bool success) external override {
+        // Only proceed if transaction was successful
+        if (!success) return;
+        
+        // Since the transaction hash is the same in the pool and in the Safe,
+        // we can directly try to mark the transaction as executed
+        if (transactions[txHash].proposer != address(0)) {
+            this.markAsExecuted(txHash);
+        }
+    }
+
+    /**
+     * @notice This function is called by the Safe contract when a function is not found
+     * @dev It prevents the Safe from being locked during upgrades
+     */
+    fallback() external {
+        // We do not want to revert here to prevent the Safe from being locked during upgrades
     }
 }
