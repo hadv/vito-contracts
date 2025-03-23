@@ -16,13 +16,20 @@ contract SafeTxPool is BaseGuard {
         address proposer;
         // Signature management
         bytes[] signatures;
-        mapping(address => bool) hasSignedBy;
         // Safe transaction nonce
         uint256 nonce;
+        // Transaction ID to distinguish between reused transaction hashes
+        uint256 txId;
     }
+
+    // Counter for transaction IDs
+    uint256 private _txIdCounter;
 
     // Mapping from transaction hash to SafeTx
     mapping(bytes32 => SafeTx) public transactions;
+
+    // Mapping from transaction hash and ID to signer's signature status
+    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) private hasSignedByTxId;
 
     // Mapping from Safe address to array of pending transaction hashes
     mapping(address => bytes32[]) private pendingTxsBySafe;
@@ -35,14 +42,15 @@ contract SafeTxPool is BaseGuard {
         uint256 value,
         bytes data,
         Enum.Operation operation,
-        uint256 nonce
+        uint256 nonce,
+        uint256 txId
     );
 
-    event TransactionSigned(bytes32 indexed txHash, address indexed signer, bytes signature);
+    event TransactionSigned(bytes32 indexed txHash, address indexed signer, bytes signature, uint256 txId);
 
-    event TransactionExecuted(bytes32 indexed txHash, address indexed safe);
+    event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
 
-    event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer);
+    event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
 
     error AlreadySigned();
     error TransactionNotFound();
@@ -71,6 +79,9 @@ contract SafeTxPool is BaseGuard {
         // Ensure transaction hasn't been proposed before
         require(transactions[txHash].proposer == address(0), "Transaction already proposed");
 
+        // Create a new transaction ID
+        uint256 txId = ++_txIdCounter;
+
         SafeTx storage newTx = transactions[txHash];
         newTx.safe = safe;
         newTx.to = to;
@@ -79,12 +90,13 @@ contract SafeTxPool is BaseGuard {
         newTx.operation = operation;
         newTx.proposer = msg.sender;
         newTx.nonce = nonce;
+        newTx.txId = txId;
 
         // Add to pending transactions for this Safe
         pendingTxsBySafe[safe].push(txHash);
 
         // Emit event
-        emit TransactionProposed(txHash, msg.sender, safe, to, value, data, operation, nonce);
+        emit TransactionProposed(txHash, msg.sender, safe, to, value, data, operation, nonce, txId);
     }
 
     /**
@@ -98,17 +110,19 @@ contract SafeTxPool is BaseGuard {
         // Check if transaction exists
         if (safeTx.proposer == address(0)) revert TransactionNotFound();
 
+        uint256 txId = safeTx.txId;
+
         // Recover signer from signature
         address signer = _recoverSigner(txHash, signature);
 
         // Check if signer hasn't already signed
-        if (safeTx.hasSignedBy[signer]) revert AlreadySigned();
+        if (hasSignedByTxId[txHash][txId][signer]) revert AlreadySigned();
 
         // Store signature
         safeTx.signatures.push(signature);
-        safeTx.hasSignedBy[signer] = true;
+        hasSignedByTxId[txHash][txId][signer] = true;
 
-        emit TransactionSigned(txHash, signer, signature);
+        emit TransactionSigned(txHash, signer, signature, txId);
     }
 
     /**
@@ -124,13 +138,15 @@ contract SafeTxPool is BaseGuard {
         // Check if caller is the Safe wallet or this contract (when called from checkAfterExecution)
         if (msg.sender != safeTx.safe && msg.sender != address(this)) revert NotSafeWallet();
 
+        uint256 txId = safeTx.txId;
+
         // Remove from pending transactions for this Safe
         _removeFromPending(safeTx.safe, txHash);
 
         // Delete transaction data
         delete transactions[txHash];
 
-        emit TransactionExecuted(txHash, safeTx.safe);
+        emit TransactionExecuted(txHash, safeTx.safe, txId);
     }
 
     /**
@@ -143,6 +159,7 @@ contract SafeTxPool is BaseGuard {
      * @return operation Operation type
      * @return proposer Address of proposer
      * @return nonce Safe transaction nonce
+     * @return txId Transaction ID
      */
     function getTxDetails(bytes32 txHash)
         external
@@ -154,11 +171,21 @@ contract SafeTxPool is BaseGuard {
             bytes memory data,
             Enum.Operation operation,
             address proposer,
-            uint256 nonce
+            uint256 nonce,
+            uint256 txId
         )
     {
         SafeTx storage safeTx = transactions[txHash];
-        return (safeTx.safe, safeTx.to, safeTx.value, safeTx.data, safeTx.operation, safeTx.proposer, safeTx.nonce);
+        return (
+            safeTx.safe,
+            safeTx.to,
+            safeTx.value,
+            safeTx.data,
+            safeTx.operation,
+            safeTx.proposer,
+            safeTx.nonce,
+            safeTx.txId
+        );
     }
 
     /**
@@ -177,7 +204,10 @@ contract SafeTxPool is BaseGuard {
      * @return True if the address has signed
      */
     function hasSignedTx(bytes32 txHash, address signer) external view returns (bool) {
-        return transactions[txHash].hasSignedBy[signer];
+        SafeTx storage safeTx = transactions[txHash];
+        if (safeTx.proposer == address(0)) return false;
+
+        return hasSignedByTxId[txHash][safeTx.txId][signer];
     }
 
     /**
@@ -269,8 +299,10 @@ contract SafeTxPool is BaseGuard {
         // Check if caller is the proposer
         if (msg.sender != safeTx.proposer) revert NotProposer();
 
-        // Get Safe address before deletion
+        // Get Safe address and transaction ID before deletion
         address safe = safeTx.safe;
+        address proposer = safeTx.proposer;
+        uint256 txId = safeTx.txId;
 
         // Remove specific transaction from pending list
         bytes32[] storage pendingTxs = pendingTxsBySafe[safe];
@@ -287,7 +319,7 @@ contract SafeTxPool is BaseGuard {
         // Delete transaction data
         delete transactions[txHash];
 
-        emit TransactionDeleted(txHash, safe, msg.sender);
+        emit TransactionDeleted(txHash, safe, proposer, txId);
     }
 
     /**

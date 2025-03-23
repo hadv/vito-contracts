@@ -6,7 +6,7 @@ import {SafeTxPool} from "../src/SafeTxPool.sol";
 import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 contract SafeTxPoolTest is Test {
-    event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer);
+    event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
 
     SafeTxPool public pool;
     address public safe;
@@ -54,7 +54,8 @@ contract SafeTxPoolTest is Test {
             bytes memory txData,
             Enum.Operation txOperation,
             address txProposer,
-            uint256 txNonce
+            uint256 txNonce,
+            uint256 txId
         ) = pool.getTxDetails(txHash);
 
         assertEq(txSafe, safe);
@@ -64,6 +65,7 @@ contract SafeTxPoolTest is Test {
         assertEq(uint256(txOperation), uint256(Enum.Operation.Call));
         assertEq(txProposer, owner1);
         assertEq(txNonce, 0);
+        assertGt(txId, 0);
 
         // Verify pending transactions for this Safe
         bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 1);
@@ -155,39 +157,23 @@ contract SafeTxPoolTest is Test {
         vm.prank(owner1);
         pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
 
-        // Try to propose same transaction again
+        // Try to propose same transaction again - should revert
         vm.prank(owner2);
         vm.expectRevert("Transaction already proposed");
         pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
-    }
 
-    function testMultipleSafes() public {
-        // Create another Safe
-        address safe2 = address(0x8765);
-
-        // Prepare transaction data for first Safe
-        bytes32 txHash1 = keccak256("test transaction 1");
-        bytes memory data1 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
-
-        // Prepare transaction data for second Safe
-        bytes32 txHash2 = keccak256("test transaction 2");
-        bytes memory data2 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 200 ether);
-
-        // Propose transactions for both Safes
+        // Delete the transaction
         vm.prank(owner1);
-        pool.proposeTx(txHash1, safe, recipient, 0, data1, Enum.Operation.Call, 0);
+        pool.deleteTx(txHash);
 
+        // Now should be able to repropose
         vm.prank(owner2);
-        pool.proposeTx(txHash2, safe2, recipient, 0, data2, Enum.Operation.Call, 0);
+        pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
 
-        // Verify pending transactions for each Safe
-        bytes32[] memory pendingTxs1 = pool.getPendingTxHashes(safe, 0, 1);
-        bytes32[] memory pendingTxs2 = pool.getPendingTxHashes(safe2, 0, 1);
-
-        assertEq(pendingTxs1.length, 1);
-        assertEq(pendingTxs2.length, 1);
-        assertEq(pendingTxs1[0], txHash1);
-        assertEq(pendingTxs2[0], txHash2);
+        // Verify it was successfully proposed
+        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
+        assertEq(txProposer, owner2);
+        assertEq(txSafe, safe);
     }
 
     function testDeleteTx() public {
@@ -346,10 +332,13 @@ contract SafeTxPoolTest is Test {
         vm.prank(owner2);
         pool.proposeTx(txHash2, safe, recipient, 0, data2, Enum.Operation.Call, 1); // same nonce 1
 
+        // Get txId before deletion
+        (,,,,,,, uint256 txId1) = pool.getTxDetails(txHash1);
+
         // Delete first transaction
         vm.prank(owner1);
         vm.expectEmit(true, true, true, true);
-        emit TransactionDeleted(txHash1, safe, owner1);
+        emit TransactionDeleted(txHash1, safe, owner1, txId1);
         pool.deleteTx(txHash1);
 
         // Verify second transaction still exists
@@ -358,12 +347,12 @@ contract SafeTxPoolTest is Test {
         assertEq(pendingTxs[0], txHash2);
 
         // Verify first transaction data is deleted
-        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHash1);
+        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash1);
         assertEq(txProposer, address(0));
         assertEq(txSafe, address(0));
 
         // Verify second transaction data is intact
-        (address safe_,,,,, address proposer_, uint256 nonce_) = pool.getTxDetails(txHash2);
+        (address safe_,,,,, address proposer_, uint256 nonce_,) = pool.getTxDetails(txHash2);
         assertEq(proposer_, owner2);
         assertEq(safe_, safe);
         assertEq(nonce_, 1);
@@ -391,7 +380,7 @@ contract SafeTxPoolTest is Test {
         assertEq(pendingTxs[1], txHashes[2]);
 
         // Verify middle transaction is properly deleted
-        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHashes[1]);
+        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHashes[1]);
         assertEq(txProposer, address(0));
         assertEq(txSafe, address(0));
     }
@@ -418,8 +407,137 @@ contract SafeTxPoolTest is Test {
         assertEq(pendingTxs[1], txHashes[1]);
 
         // Try to get details of deleted transaction
-        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHashes[2]);
+        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHashes[2]);
         assertEq(txProposer, address(0));
         assertEq(txSafe, address(0));
+    }
+
+    function testDeleteAndReproposeTx() public {
+        // Test the specific error scenario:
+        // 1. Propose transaction
+        // 2. Sign it
+        // 3. Delete it
+        // 4. Propose again with the same hash
+        // 5. Sign again - should work correctly with our fix
+
+        // Prepare transaction data
+        bytes32 txHash = keccak256("test transaction");
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        // 1. Propose transaction
+        vm.prank(owner1);
+        pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        // 2. Sign transaction
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(owner1Key, txHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        vm.prank(owner1);
+        pool.signTx(txHash, signature);
+
+        // Verify signature is recorded
+        assertTrue(pool.hasSignedTx(txHash, owner1));
+
+        // Get txId for first proposal
+        (,,,,,, uint256 nonce, uint256 firstTxId) = pool.getTxDetails(txHash);
+
+        // 3. Delete transaction
+        vm.prank(owner1);
+        pool.deleteTx(txHash);
+
+        // 4. Propose again with the same hash
+        vm.prank(owner1);
+        pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        // Get txId for second proposal - should be different
+        (,,,,,, uint256 nonce2, uint256 secondTxId) = pool.getTxDetails(txHash);
+        assertEq(nonce, nonce2);
+        assertTrue(secondTxId > firstTxId, "New transaction should have a higher txId");
+
+        // 5. Sign again - should work correctly with our fix
+        vm.prank(owner1);
+        pool.signTx(txHash, signature);
+
+        // Verify signature is recorded for the new proposal
+        assertTrue(pool.hasSignedTx(txHash, owner1));
+
+        // Verify we have signatures
+        bytes[] memory signatures = pool.getSignatures(txHash);
+        assertEq(signatures.length, 1);
+    }
+
+    function testMultipleSignaturesAfterRepropose() public {
+        // Test scenario with multiple signers after reproposing
+
+        // Prepare transaction data
+        bytes32 txHash = keccak256("multi-sig transaction");
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        // First proposal
+        vm.prank(owner1);
+        pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        // First signer signs
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(owner1Key, txHash);
+        bytes memory signature1 = abi.encodePacked(r1, s1, v1);
+
+        vm.prank(owner1);
+        pool.signTx(txHash, signature1);
+
+        // Delete transaction
+        vm.prank(owner1);
+        pool.deleteTx(txHash);
+
+        // Repropose same transaction
+        vm.prank(owner1);
+        pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        // First signer signs again
+        vm.prank(owner1);
+        pool.signTx(txHash, signature1);
+
+        // Second signer signs
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(owner2Key, txHash);
+        bytes memory signature2 = abi.encodePacked(r2, s2, v2);
+
+        vm.prank(owner2);
+        pool.signTx(txHash, signature2);
+
+        // Verify both signatures are recorded
+        assertTrue(pool.hasSignedTx(txHash, owner1));
+        assertTrue(pool.hasSignedTx(txHash, owner2));
+
+        // Verify we have both signatures
+        bytes[] memory signatures = pool.getSignatures(txHash);
+        assertEq(signatures.length, 2);
+    }
+
+    function testMultipleSafes() public {
+        // Create another Safe
+        address safe2 = address(0x8765);
+
+        // Prepare transaction data for first Safe
+        bytes32 txHash1 = keccak256("test transaction 1");
+        bytes memory data1 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        // Prepare transaction data for second Safe
+        bytes32 txHash2 = keccak256("test transaction 2");
+        bytes memory data2 = abi.encodeWithSignature("transfer(address,uint256)", recipient, 200 ether);
+
+        // Propose transactions for both Safes
+        vm.prank(owner1);
+        pool.proposeTx(txHash1, safe, recipient, 0, data1, Enum.Operation.Call, 0);
+
+        vm.prank(owner2);
+        pool.proposeTx(txHash2, safe2, recipient, 0, data2, Enum.Operation.Call, 0);
+
+        // Verify pending transactions for each Safe
+        bytes32[] memory pendingTxs1 = pool.getPendingTxHashes(safe, 0, 1);
+        bytes32[] memory pendingTxs2 = pool.getPendingTxHashes(safe2, 0, 1);
+
+        assertEq(pendingTxs1.length, 1);
+        assertEq(pendingTxs2.length, 1);
+        assertEq(pendingTxs1[0], txHash1);
+        assertEq(pendingTxs2[0], txHash2);
     }
 }
