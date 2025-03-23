@@ -77,7 +77,7 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(pendingTxs.length, 0);
 
         // Verify transaction data is deleted
-        (address txSafe,,,,, address txProposer,) = pool.getTxDetails(txHash);
+        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
         assertEq(txProposer, address(0));
         assertEq(txSafe, address(0));
     }
