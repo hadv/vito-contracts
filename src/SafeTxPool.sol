@@ -24,9 +24,8 @@ contract SafeTxPool is BaseGuard {
 
     // Simple struct for address book entries
     struct AddressBookEntry {
-        string name;
+        bytes32 name; // Limited to 32 bytes
         address walletAddress; // Mandatory
-        string description;
     }
 
     // Counter for transaction IDs
@@ -62,7 +61,7 @@ contract SafeTxPool is BaseGuard {
 
     event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
 
-    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, string name);
+    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
 
     error AlreadySigned();
@@ -388,12 +387,9 @@ contract SafeTxPool is BaseGuard {
      * @notice Add an entry to the address book of a Safe
      * @param safe The Safe wallet address that owns this address book
      * @param walletAddress The wallet address to add (mandatory)
-     * @param name Name associated with the address (optional)
-     * @param description Short description for the address (optional)
+     * @param name Name associated with the address (32 bytes)
      */
-    function addAddressBookEntry(address safe, address walletAddress, string calldata name, string calldata description)
-        external
-    {
+    function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external {
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
 
@@ -403,12 +399,9 @@ contract SafeTxPool is BaseGuard {
             // Update existing entry
             uint256 index = uint256(existingIndex);
             addressBooks[safe][index].name = name;
-            addressBooks[safe][index].description = description;
         } else {
             // Add new entry
-            addressBooks[safe].push(
-                AddressBookEntry({name: name, walletAddress: walletAddress, description: description})
-            );
+            addressBooks[safe].push(AddressBookEntry({name: name, walletAddress: walletAddress}));
         }
 
         emit AddressBookEntryAdded(safe, walletAddress, name);

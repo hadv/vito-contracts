@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SafeTxPool} from "../src/SafeTxPool.sol";
 
 contract SafeTxPoolAddressBookTest is Test {
-    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, string name);
+    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
 
     SafeTxPool public pool;
@@ -27,75 +27,76 @@ contract SafeTxPoolAddressBookTest is Test {
 
     function testAddAddressBookEntry() public {
         // Test adding a new entry
+        bytes32 name = bytes32("Alice");
         vm.expectEmit(true, true, true, true);
-        emit AddressBookEntryAdded(safe, walletAddress1, "Alice");
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
+        emit AddressBookEntryAdded(safe, walletAddress1, name);
+        pool.addAddressBookEntry(safe, walletAddress1, name);
 
         // Get all entries and verify
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
         assertEq(entries.length, 1);
-        assertEq(entries[0].name, "Alice");
         assertEq(entries[0].walletAddress, walletAddress1);
-        assertEq(entries[0].description, "Team member");
+        assertEq(entries[0].name, name);
     }
 
     function testUpdateExistingAddressBookEntry() public {
         // Add initial entry
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
+        bytes32 name1 = bytes32("Alice");
+        pool.addAddressBookEntry(safe, walletAddress1, name1);
 
         // Update the entry
+        bytes32 name2 = bytes32("Alice Updated");
         vm.expectEmit(true, true, true, true);
-        emit AddressBookEntryAdded(safe, walletAddress1, "Alice Updated");
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice Updated", "Lead developer");
+        emit AddressBookEntryAdded(safe, walletAddress1, name2);
+        pool.addAddressBookEntry(safe, walletAddress1, name2);
 
         // Get all entries and verify update
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
         assertEq(entries.length, 1);
-        assertEq(entries[0].name, "Alice Updated");
         assertEq(entries[0].walletAddress, walletAddress1);
-        assertEq(entries[0].description, "Lead developer");
+        assertEq(entries[0].name, name2);
     }
 
     function testAddMultipleAddressBookEntries() public {
         // Add multiple entries
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
-        pool.addAddressBookEntry(safe, walletAddress2, "Bob", "Developer");
-        pool.addAddressBookEntry(safe, walletAddress3, "Carol", "Designer");
+        bytes32 name1 = bytes32("Alice");
+        bytes32 name2 = bytes32("Bob");
+        bytes32 name3 = bytes32("Carol");
+        pool.addAddressBookEntry(safe, walletAddress1, name1);
+        pool.addAddressBookEntry(safe, walletAddress2, name2);
+        pool.addAddressBookEntry(safe, walletAddress3, name3);
 
         // Get all entries and verify
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
         assertEq(entries.length, 3);
 
-        // Verify each entry - note that order may vary based on implementation
-        bool foundAlice = false;
-        bool foundBob = false;
-        bool foundCarol = false;
+        // Verify each entry by address - order may vary based on implementation
+        bool foundWallet1 = false;
+        bool foundWallet2 = false;
+        bool foundWallet3 = false;
 
         for (uint256 i = 0; i < entries.length; i++) {
             if (entries[i].walletAddress == walletAddress1) {
-                assertEq(entries[i].name, "Alice");
-                assertEq(entries[i].description, "Team member");
-                foundAlice = true;
+                assertEq(entries[i].name, name1);
+                foundWallet1 = true;
             } else if (entries[i].walletAddress == walletAddress2) {
-                assertEq(entries[i].name, "Bob");
-                assertEq(entries[i].description, "Developer");
-                foundBob = true;
+                assertEq(entries[i].name, name2);
+                foundWallet2 = true;
             } else if (entries[i].walletAddress == walletAddress3) {
-                assertEq(entries[i].name, "Carol");
-                assertEq(entries[i].description, "Designer");
-                foundCarol = true;
+                assertEq(entries[i].name, name3);
+                foundWallet3 = true;
             }
         }
 
-        assertTrue(foundAlice);
-        assertTrue(foundBob);
-        assertTrue(foundCarol);
+        assertTrue(foundWallet1);
+        assertTrue(foundWallet2);
+        assertTrue(foundWallet3);
     }
 
     function testRemoveAddressBookEntry() public {
         // Add entries
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
-        pool.addAddressBookEntry(safe, walletAddress2, "Bob", "Developer");
+        pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
+        pool.addAddressBookEntry(safe, walletAddress2, bytes32("Bob"));
 
         // Remove one entry
         vm.expectEmit(true, true, true, true);
@@ -105,14 +106,12 @@ contract SafeTxPoolAddressBookTest is Test {
         // Get entries and verify
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
         assertEq(entries.length, 1);
-        assertEq(entries[0].name, "Bob");
         assertEq(entries[0].walletAddress, walletAddress2);
-        assertEq(entries[0].description, "Developer");
     }
 
     function testRemoveLastAddressBookEntry() public {
         // Add an entry
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
+        pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
 
         // Remove the entry
         pool.removeAddressBookEntry(safe, walletAddress1);
@@ -133,12 +132,16 @@ contract SafeTxPoolAddressBookTest is Test {
         address safe2 = address(0x9876);
 
         // Add entries to first Safe
-        pool.addAddressBookEntry(safe, walletAddress1, "Alice", "Team member");
-        pool.addAddressBookEntry(safe, walletAddress2, "Bob", "Developer");
+        bytes32 name1 = bytes32("Alice");
+        bytes32 name2 = bytes32("Bob");
+        pool.addAddressBookEntry(safe, walletAddress1, name1);
+        pool.addAddressBookEntry(safe, walletAddress2, name2);
 
         // Add entries to second Safe
-        pool.addAddressBookEntry(safe2, walletAddress1, "Alice at Safe2", "Contributor");
-        pool.addAddressBookEntry(safe2, walletAddress3, "Carol at Safe2", "Advisor");
+        bytes32 name3 = bytes32("Alice at Safe2");
+        bytes32 name4 = bytes32("Carol at Safe2");
+        pool.addAddressBookEntry(safe2, walletAddress1, name3);
+        pool.addAddressBookEntry(safe2, walletAddress3, name4);
 
         // Get entries for first Safe and verify
         SafeTxPool.AddressBookEntry[] memory entries1 = pool.getAddressBookEntries(safe);
@@ -148,49 +151,45 @@ contract SafeTxPoolAddressBookTest is Test {
         SafeTxPool.AddressBookEntry[] memory entries2 = pool.getAddressBookEntries(safe2);
         assertEq(entries2.length, 2);
 
-        // Verify first Safe's entries
-        bool foundAlice = false;
-        bool foundBob = false;
+        // Verify addresses in first Safe
+        bool foundWallet1InSafe1 = false;
+        bool foundWallet2InSafe1 = false;
 
         for (uint256 i = 0; i < entries1.length; i++) {
             if (entries1[i].walletAddress == walletAddress1) {
-                assertEq(entries1[i].name, "Alice");
-                assertEq(entries1[i].description, "Team member");
-                foundAlice = true;
+                assertEq(entries1[i].name, name1);
+                foundWallet1InSafe1 = true;
             } else if (entries1[i].walletAddress == walletAddress2) {
-                assertEq(entries1[i].name, "Bob");
-                assertEq(entries1[i].description, "Developer");
-                foundBob = true;
+                assertEq(entries1[i].name, name2);
+                foundWallet2InSafe1 = true;
             }
         }
 
-        assertTrue(foundAlice);
-        assertTrue(foundBob);
+        assertTrue(foundWallet1InSafe1);
+        assertTrue(foundWallet2InSafe1);
 
-        // Verify second Safe's entries
-        bool foundAliceAtSafe2 = false;
-        bool foundCarolAtSafe2 = false;
+        // Verify addresses in second Safe
+        bool foundWallet1InSafe2 = false;
+        bool foundWallet3InSafe2 = false;
 
         for (uint256 i = 0; i < entries2.length; i++) {
             if (entries2[i].walletAddress == walletAddress1) {
-                assertEq(entries2[i].name, "Alice at Safe2");
-                assertEq(entries2[i].description, "Contributor");
-                foundAliceAtSafe2 = true;
+                assertEq(entries2[i].name, name3);
+                foundWallet1InSafe2 = true;
             } else if (entries2[i].walletAddress == walletAddress3) {
-                assertEq(entries2[i].name, "Carol at Safe2");
-                assertEq(entries2[i].description, "Advisor");
-                foundCarolAtSafe2 = true;
+                assertEq(entries2[i].name, name4);
+                foundWallet3InSafe2 = true;
             }
         }
 
-        assertTrue(foundAliceAtSafe2);
-        assertTrue(foundCarolAtSafe2);
+        assertTrue(foundWallet1InSafe2);
+        assertTrue(foundWallet3InSafe2);
     }
 
     function test_RevertWhen_AddingInvalidAddress() public {
         // Try to add entry with zero address
         vm.expectRevert(SafeTxPool.InvalidAddress.selector);
-        pool.addAddressBookEntry(safe, address(0), "Invalid", "This should fail");
+        pool.addAddressBookEntry(safe, address(0), bytes32("Invalid"));
     }
 
     function test_RevertWhen_RemovingNonExistentEntry() public {
