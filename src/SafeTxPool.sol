@@ -391,15 +391,12 @@ contract SafeTxPool is BaseGuard {
      * @param name Name associated with the address (optional)
      * @param description Short description for the address (optional)
      */
-    function addAddressBookEntry(
-        address safe,
-        address walletAddress,
-        string calldata name,
-        string calldata description
-    ) external {
+    function addAddressBookEntry(address safe, address walletAddress, string calldata name, string calldata description)
+        external
+    {
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
-        
+
         // Check if entry already exists
         int256 existingIndex = _findAddressBookEntry(safe, walletAddress);
         if (existingIndex >= 0) {
@@ -409,11 +406,9 @@ contract SafeTxPool is BaseGuard {
             addressBooks[safe][index].description = description;
         } else {
             // Add new entry
-            addressBooks[safe].push(AddressBookEntry({
-                name: name,
-                walletAddress: walletAddress,
-                description: description
-            }));
+            addressBooks[safe].push(
+                AddressBookEntry({name: name, walletAddress: walletAddress, description: description})
+            );
         }
 
         emit AddressBookEntryAdded(safe, walletAddress, name);
@@ -426,21 +421,21 @@ contract SafeTxPool is BaseGuard {
      */
     function removeAddressBookEntry(address safe, address walletAddress) external {
         int256 index = _findAddressBookEntry(safe, walletAddress);
-        
+
         if (index < 0) revert AddressNotFound();
-        
+
         // Get the array
         AddressBookEntry[] storage entries = addressBooks[safe];
         uint256 entryIndex = uint256(index);
-        
+
         // Move the last element to the position of the element to delete (if it's not the last)
         if (entryIndex < entries.length - 1) {
             entries[entryIndex] = entries[entries.length - 1];
         }
-        
+
         // Remove the last element
         entries.pop();
-        
+
         emit AddressBookEntryRemoved(safe, walletAddress);
     }
 
@@ -452,7 +447,7 @@ contract SafeTxPool is BaseGuard {
     function getAddressBookEntries(address safe) external view returns (AddressBookEntry[] memory) {
         return addressBooks[safe];
     }
-    
+
     /**
      * @notice Internal function to find an entry's index in the address book
      * @param safe The Safe wallet address
@@ -461,13 +456,13 @@ contract SafeTxPool is BaseGuard {
      */
     function _findAddressBookEntry(address safe, address walletAddress) internal view returns (int256) {
         AddressBookEntry[] storage entries = addressBooks[safe];
-        
+
         for (uint256 i = 0; i < entries.length; i++) {
             if (entries[i].walletAddress == walletAddress) {
                 return int256(i);
             }
         }
-        
+
         return -1; // Not found
     }
 }
