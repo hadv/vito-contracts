@@ -22,6 +22,13 @@ contract SafeTxPool is BaseGuard {
         uint256 txId;
     }
 
+    // Simple struct for address book entries
+    struct AddressBookEntry {
+        string name;
+        address walletAddress; // Mandatory
+        string description;
+    }
+
     // Counter for transaction IDs
     uint256 private _txIdCounter;
 
@@ -33,6 +40,9 @@ contract SafeTxPool is BaseGuard {
 
     // Mapping from Safe address to array of pending transaction hashes
     mapping(address => bytes32[]) private pendingTxsBySafe;
+
+    // Mapping from Safe address to its array of address book entries
+    mapping(address => AddressBookEntry[]) private addressBooks;
 
     event TransactionProposed(
         bytes32 indexed txHash,
@@ -52,10 +62,16 @@ contract SafeTxPool is BaseGuard {
 
     event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
 
+    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, string name);
+    event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
+
     error AlreadySigned();
     error TransactionNotFound();
     error NotSafeWallet();
     error NotProposer();
+    error InvalidAddress();
+    error AddressAlreadyExists();
+    error AddressNotFound();
 
     /**
      * @notice Propose a new Safe transaction
@@ -366,5 +382,87 @@ contract SafeTxPool is BaseGuard {
      */
     fallback() external {
         // We do not want to revert here to prevent the Safe from being locked during upgrades
+    }
+
+    /**
+     * @notice Add an entry to the address book of a Safe
+     * @param safe The Safe wallet address that owns this address book
+     * @param walletAddress The wallet address to add (mandatory)
+     * @param name Name associated with the address (optional)
+     * @param description Short description for the address (optional)
+     */
+    function addAddressBookEntry(address safe, address walletAddress, string calldata name, string calldata description)
+        external
+    {
+        // Validate inputs
+        if (walletAddress == address(0)) revert InvalidAddress();
+
+        // Check if entry already exists
+        int256 existingIndex = _findAddressBookEntry(safe, walletAddress);
+        if (existingIndex >= 0) {
+            // Update existing entry
+            uint256 index = uint256(existingIndex);
+            addressBooks[safe][index].name = name;
+            addressBooks[safe][index].description = description;
+        } else {
+            // Add new entry
+            addressBooks[safe].push(
+                AddressBookEntry({name: name, walletAddress: walletAddress, description: description})
+            );
+        }
+
+        emit AddressBookEntryAdded(safe, walletAddress, name);
+    }
+
+    /**
+     * @notice Remove an entry from the address book of a Safe
+     * @param safe The Safe wallet address that owns this address book
+     * @param walletAddress The wallet address to remove
+     */
+    function removeAddressBookEntry(address safe, address walletAddress) external {
+        int256 index = _findAddressBookEntry(safe, walletAddress);
+
+        if (index < 0) revert AddressNotFound();
+
+        // Get the array
+        AddressBookEntry[] storage entries = addressBooks[safe];
+        uint256 entryIndex = uint256(index);
+
+        // Move the last element to the position of the element to delete (if it's not the last)
+        if (entryIndex < entries.length - 1) {
+            entries[entryIndex] = entries[entries.length - 1];
+        }
+
+        // Remove the last element
+        entries.pop();
+
+        emit AddressBookEntryRemoved(safe, walletAddress);
+    }
+
+    /**
+     * @notice Get all address book entries for a Safe
+     * @param safe The Safe wallet address
+     * @return entries Array of address book entries
+     */
+    function getAddressBookEntries(address safe) external view returns (AddressBookEntry[] memory) {
+        return addressBooks[safe];
+    }
+
+    /**
+     * @notice Internal function to find an entry's index in the address book
+     * @param safe The Safe wallet address
+     * @param walletAddress The wallet address to find
+     * @return Index of the entry, or -1 if not found
+     */
+    function _findAddressBookEntry(address safe, address walletAddress) internal view returns (int256) {
+        AddressBookEntry[] storage entries = addressBooks[safe];
+
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (entries[i].walletAddress == walletAddress) {
+                return int256(i);
+            }
+        }
+
+        return -1; // Not found
     }
 }
