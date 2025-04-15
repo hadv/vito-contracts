@@ -71,6 +71,7 @@ contract SafeTxPool is BaseGuard {
     error InvalidAddress();
     error AddressAlreadyExists();
     error AddressNotFound();
+    error AddressNotInAddressBook();
 
     /**
      * @notice Propose a new Safe transaction
@@ -354,8 +355,9 @@ contract SafeTxPool is BaseGuard {
         bytes memory signatures,
         address msgSender
     ) external view override {
-        // No pre-execution checks needed
-        // This guard focuses on post-execution
+        // Check if the destination address is in the address book
+        int256 addressIndex = _findAddressBookEntry(msg.sender, to);
+        if (addressIndex < 0) revert AddressNotInAddressBook();
     }
 
     /**
