@@ -392,6 +392,9 @@ contract SafeTxPool is BaseGuard {
      * @param name Name associated with the address (32 bytes)
      */
     function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external {
+        // Only the Safe wallet itself can manage its address book
+        if (msg.sender != safe) revert NotSafeWallet();
+        
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
 
@@ -415,6 +418,9 @@ contract SafeTxPool is BaseGuard {
      * @param walletAddress The wallet address to remove
      */
     function removeAddressBookEntry(address safe, address walletAddress) external {
+        // Only the Safe wallet itself can manage its address book
+        if (msg.sender != safe) revert NotSafeWallet();
+        
         int256 index = _findAddressBookEntry(safe, walletAddress);
 
         if (index < 0) revert AddressNotFound();

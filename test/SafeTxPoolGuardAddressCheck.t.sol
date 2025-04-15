@@ -58,7 +58,8 @@ contract SafeTxPoolGuardAddressCheckTest is Test {
         // Deploy mock Safe with the guard
         mockSafe = new MockSafeWithGuard(pool);
         
-        // Add an address to the address book
+        // Add an address to the address book (prank as the mock Safe since only Safe can manage its address book)
+        vm.prank(address(mockSafe));
         pool.addAddressBookEntry(address(mockSafe), addressInBook, nameInBook);
     }
     
@@ -96,7 +97,8 @@ contract SafeTxPoolGuardAddressCheckTest is Test {
             Enum.Operation.Call
         );
         
-        // Add the address to the address book
+        // Add the address to the address book - prank as the mockSafe
+        vm.prank(address(mockSafe));
         pool.addAddressBookEntry(address(mockSafe), addressNotInBook, bytes32("NewlyAddedAddress"));
         
         // Now the transaction should succeed
@@ -120,7 +122,8 @@ contract SafeTxPoolGuardAddressCheckTest is Test {
             Enum.Operation.Call
         );
         
-        // Remove the address from the address book
+        // Remove the address from the address book - prank as the mockSafe
+        vm.prank(address(mockSafe));
         pool.removeAddressBookEntry(address(mockSafe), addressInBook);
         
         // Now the transaction should revert
@@ -131,5 +134,17 @@ contract SafeTxPoolGuardAddressCheckTest is Test {
             hex"",
             Enum.Operation.Call
         );
+    }
+    
+    function testRevertWhenNonSafeAddsToAddressBook() public {
+        // Try to add an address to the address book as a non-Safe wallet
+        vm.expectRevert(SafeTxPool.NotSafeWallet.selector);
+        pool.addAddressBookEntry(address(mockSafe), addressNotInBook, bytes32("Unauthorized"));
+    }
+    
+    function testRevertWhenNonSafeRemovesFromAddressBook() public {
+        // Try to remove an address from the address book as a non-Safe wallet
+        vm.expectRevert(SafeTxPool.NotSafeWallet.selector);
+        pool.removeAddressBookEntry(address(mockSafe), addressInBook);
     }
 } 
