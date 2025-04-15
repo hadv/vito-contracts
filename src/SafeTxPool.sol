@@ -71,6 +71,7 @@ contract SafeTxPool is BaseGuard {
     error InvalidAddress();
     error AddressAlreadyExists();
     error AddressNotFound();
+    error AddressNotInAddressBook();
 
     /**
      * @notice Propose a new Safe transaction
@@ -354,8 +355,12 @@ contract SafeTxPool is BaseGuard {
         bytes memory signatures,
         address msgSender
     ) external view override {
-        // No pre-execution checks needed
-        // This guard focuses on post-execution
+        // Check if the destination address is in the Safe's address book
+        address safe = msg.sender;
+        int256 index = _findAddressBookEntry(safe, to);
+
+        // If the address is not in the address book, revert
+        if (index < 0) revert AddressNotInAddressBook();
     }
 
     /**
@@ -390,6 +395,9 @@ contract SafeTxPool is BaseGuard {
      * @param name Name associated with the address (32 bytes)
      */
     function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external {
+        // Only the Safe wallet itself can modify its address book
+        if (msg.sender != safe) revert NotSafeWallet();
+
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
 
@@ -413,6 +421,9 @@ contract SafeTxPool is BaseGuard {
      * @param walletAddress The wallet address to remove
      */
     function removeAddressBookEntry(address safe, address walletAddress) external {
+        // Only the Safe wallet itself can modify its address book
+        if (msg.sender != safe) revert NotSafeWallet();
+
         int256 index = _findAddressBookEntry(safe, walletAddress);
 
         if (index < 0) revert AddressNotFound();
