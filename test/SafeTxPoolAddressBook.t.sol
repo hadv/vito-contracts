@@ -28,6 +28,7 @@ contract SafeTxPoolAddressBookTest is Test {
     function testAddAddressBookEntry() public {
         // Test adding a new entry
         bytes32 name = bytes32("Alice");
+        vm.prank(safe);
         vm.expectEmit(true, true, true, true);
         emit AddressBookEntryAdded(safe, walletAddress1, name);
         pool.addAddressBookEntry(safe, walletAddress1, name);
@@ -42,10 +43,12 @@ contract SafeTxPoolAddressBookTest is Test {
     function testUpdateExistingAddressBookEntry() public {
         // Add initial entry
         bytes32 name1 = bytes32("Alice");
+        vm.prank(safe);
         pool.addAddressBookEntry(safe, walletAddress1, name1);
 
         // Update the entry
         bytes32 name2 = bytes32("Alice Updated");
+        vm.prank(safe);
         vm.expectEmit(true, true, true, true);
         emit AddressBookEntryAdded(safe, walletAddress1, name2);
         pool.addAddressBookEntry(safe, walletAddress1, name2);
@@ -62,9 +65,11 @@ contract SafeTxPoolAddressBookTest is Test {
         bytes32 name1 = bytes32("Alice");
         bytes32 name2 = bytes32("Bob");
         bytes32 name3 = bytes32("Carol");
+        vm.startPrank(safe);
         pool.addAddressBookEntry(safe, walletAddress1, name1);
         pool.addAddressBookEntry(safe, walletAddress2, name2);
         pool.addAddressBookEntry(safe, walletAddress3, name3);
+        vm.stopPrank();
 
         // Get all entries and verify
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
@@ -95,6 +100,7 @@ contract SafeTxPoolAddressBookTest is Test {
 
     function testRemoveAddressBookEntry() public {
         // Add entries
+        vm.startPrank(safe);
         pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
         pool.addAddressBookEntry(safe, walletAddress2, bytes32("Bob"));
 
@@ -102,6 +108,7 @@ contract SafeTxPoolAddressBookTest is Test {
         vm.expectEmit(true, true, true, true);
         emit AddressBookEntryRemoved(safe, walletAddress1);
         pool.removeAddressBookEntry(safe, walletAddress1);
+        vm.stopPrank();
 
         // Get entries and verify
         SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
@@ -111,9 +118,11 @@ contract SafeTxPoolAddressBookTest is Test {
 
     function testRemoveLastAddressBookEntry() public {
         // Add an entry
+        vm.prank(safe);
         pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
 
         // Remove the entry
+        vm.prank(safe);
         pool.removeAddressBookEntry(safe, walletAddress1);
 
         // Get entries and verify it's empty
@@ -134,13 +143,17 @@ contract SafeTxPoolAddressBookTest is Test {
         // Add entries to first Safe
         bytes32 name1 = bytes32("Alice");
         bytes32 name2 = bytes32("Bob");
+        vm.prank(safe);
         pool.addAddressBookEntry(safe, walletAddress1, name1);
+        vm.prank(safe);
         pool.addAddressBookEntry(safe, walletAddress2, name2);
 
         // Add entries to second Safe
         bytes32 name3 = bytes32("Alice at Safe2");
         bytes32 name4 = bytes32("Carol at Safe2");
+        vm.prank(safe2);
         pool.addAddressBookEntry(safe2, walletAddress1, name3);
+        vm.prank(safe2);
         pool.addAddressBookEntry(safe2, walletAddress3, name4);
 
         // Get entries for first Safe and verify
@@ -187,13 +200,13 @@ contract SafeTxPoolAddressBookTest is Test {
     }
 
     function test_RevertWhen_AddingInvalidAddress() public {
-        // Try to add entry with zero address
+        vm.prank(safe);
         vm.expectRevert(SafeTxPool.InvalidAddress.selector);
         pool.addAddressBookEntry(safe, address(0), bytes32("Invalid"));
     }
 
     function test_RevertWhen_RemovingNonExistentEntry() public {
-        // Try to remove non-existent entry
+        vm.prank(safe);
         vm.expectRevert(SafeTxPool.AddressNotFound.selector);
         pool.removeAddressBookEntry(safe, walletAddress1);
     }
