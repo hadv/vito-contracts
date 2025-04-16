@@ -344,16 +344,16 @@ contract SafeTxPool is BaseGuard {
      */
     function checkTransaction(
         address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures,
-        address msgSender
+        uint256,
+        bytes memory,
+        Enum.Operation,
+        uint256,
+        uint256,
+        uint256,
+        address,
+        address payable,
+        bytes memory,
+        address
     ) external view override {
         // Check if the destination address is in the Safe's address book
         address safe = msg.sender;
