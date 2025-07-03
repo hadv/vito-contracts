@@ -43,6 +43,11 @@ contract SafeTxPool is BaseGuard {
     // Mapping from Safe address to its array of address book entries
     mapping(address => AddressBookEntry[]) private addressBooks;
 
+    // Delegate call control mappings
+    mapping(address => bool) private delegateCallEnabled;
+    mapping(address => mapping(address => bool)) private allowedDelegateCallTargets;
+    mapping(address => bool) private hasTargetRestrictions;
+
     event TransactionProposed(
         bytes32 indexed txHash,
         address indexed proposer,
@@ -65,6 +70,9 @@ contract SafeTxPool is BaseGuard {
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
     event SelfCallAllowed(address indexed safe, address indexed to);
     event GuardCallAllowed(address indexed safe, address indexed guard);
+    event DelegateCallToggled(address indexed safe, bool enabled);
+    event DelegateCallTargetAdded(address indexed safe, address indexed target);
+    event DelegateCallTargetRemoved(address indexed safe, address indexed target);
 
     error AlreadySigned();
     error TransactionNotFound();
@@ -74,6 +82,8 @@ contract SafeTxPool is BaseGuard {
     error AddressAlreadyExists();
     error AddressNotFound();
     error AddressNotInAddressBook();
+    error DelegateCallDisabled();
+    error DelegateCallTargetNotAllowed();
 
     /**
      * @notice Propose a new Safe transaction
@@ -348,7 +358,7 @@ contract SafeTxPool is BaseGuard {
         address to,
         uint256,
         bytes memory,
-        Enum.Operation,
+        Enum.Operation operation,
         uint256,
         uint256,
         uint256,
@@ -369,6 +379,20 @@ contract SafeTxPool is BaseGuard {
         if (to == address(this)) {
             emit GuardCallAllowed(safe, address(this));
             return;
+        }
+
+        // Check delegate call restrictions
+        if (operation == Enum.Operation.DelegateCall) {
+            // If delegate calls are not enabled for this Safe, revert
+            if (!delegateCallEnabled[safe]) {
+                revert DelegateCallDisabled();
+            }
+
+            // If delegate calls are enabled, check if there are any specific target restrictions
+            // If the target is not explicitly allowed and there are restrictions, revert
+            if (!allowedDelegateCallTargets[safe][to] && _hasDelegateCallTargetRestrictions(safe)) {
+                revert DelegateCallTargetNotAllowed();
+            }
         }
 
         // Check if the destination address is in the Safe's address book
@@ -483,5 +507,76 @@ contract SafeTxPool is BaseGuard {
         }
 
         return -1; // Not found
+    }
+
+    /**
+     * @notice Enable or disable delegate calls for a Safe
+     * @param safe The Safe wallet address
+     * @param enabled Whether delegate calls should be enabled
+     */
+    function setDelegateCallEnabled(address safe, bool enabled) external {
+        // Only the Safe wallet itself can modify its delegate call settings
+        if (msg.sender != safe) revert NotSafeWallet();
+
+        delegateCallEnabled[safe] = enabled;
+        emit DelegateCallToggled(safe, enabled);
+    }
+
+    /**
+     * @notice Add an allowed delegate call target for a Safe
+     * @param safe The Safe wallet address
+     * @param target The target address to allow for delegate calls
+     */
+    function addDelegateCallTarget(address safe, address target) external {
+        // Only the Safe wallet itself can modify its delegate call settings
+        if (msg.sender != safe) revert NotSafeWallet();
+
+        // Validate target address
+        if (target == address(0)) revert InvalidAddress();
+
+        allowedDelegateCallTargets[safe][target] = true;
+        hasTargetRestrictions[safe] = true;
+        emit DelegateCallTargetAdded(safe, target);
+    }
+
+    /**
+     * @notice Remove an allowed delegate call target for a Safe
+     * @param safe The Safe wallet address
+     * @param target The target address to remove from allowed delegate calls
+     */
+    function removeDelegateCallTarget(address safe, address target) external {
+        // Only the Safe wallet itself can modify its delegate call settings
+        if (msg.sender != safe) revert NotSafeWallet();
+
+        allowedDelegateCallTargets[safe][target] = false;
+        emit DelegateCallTargetRemoved(safe, target);
+    }
+
+    /**
+     * @notice Check if delegate calls are enabled for a Safe
+     * @param safe The Safe wallet address
+     * @return enabled Whether delegate calls are enabled
+     */
+    function isDelegateCallEnabled(address safe) external view returns (bool) {
+        return delegateCallEnabled[safe];
+    }
+
+    /**
+     * @notice Check if a target is allowed for delegate calls from a Safe
+     * @param safe The Safe wallet address
+     * @param target The target address to check
+     * @return allowed Whether the target is allowed for delegate calls
+     */
+    function isDelegateCallTargetAllowed(address safe, address target) external view returns (bool) {
+        return allowedDelegateCallTargets[safe][target];
+    }
+
+    /**
+     * @notice Internal function to check if a Safe has any delegate call target restrictions
+     * @param safe The Safe wallet address
+     * @return hasRestrictions Whether the Safe has any specific target restrictions
+     */
+    function _hasDelegateCallTargetRestrictions(address safe) internal view returns (bool) {
+        return hasTargetRestrictions[safe];
     }
 }
