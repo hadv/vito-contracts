@@ -63,6 +63,8 @@ contract SafeTxPool is BaseGuard {
 
     event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
+    event SelfCallAllowed(address indexed safe, address indexed to);
+    event GuardCallAllowed(address indexed safe, address indexed guard);
 
     error AlreadySigned();
     error TransactionNotFound();
@@ -354,9 +356,22 @@ contract SafeTxPool is BaseGuard {
         address payable,
         bytes memory,
         address
-    ) external view override {
-        // Check if the destination address is in the Safe's address book
+    ) external override {
         address safe = msg.sender;
+
+        // Always allow the Safe to call itself (needed for owner management, threshold changes, etc.)
+        if (to == safe) {
+            emit SelfCallAllowed(safe, to);
+            return;
+        }
+
+        // Always allow the Safe to call this guard contract (needed for address book management)
+        if (to == address(this)) {
+            emit GuardCallAllowed(safe, address(this));
+            return;
+        }
+
+        // Check if the destination address is in the Safe's address book
         int256 index = _findAddressBookEntry(safe, to);
 
         // If the address is not in the address book, revert

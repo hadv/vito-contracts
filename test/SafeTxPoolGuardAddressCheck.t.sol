@@ -112,4 +112,38 @@ contract SafeTxPoolGuardAddressCheckTest is Test {
         vm.expectRevert(SafeTxPool.NotSafeWallet.selector);
         pool.removeAddressBookEntry(address(mockSafe), addressInBook);
     }
+
+    function testAllowSelfCall() public {
+        // Safe should be able to call itself (for owner management, threshold changes, etc.)
+        // This should succeed even though the Safe address is not in its own address book
+        mockSafe.executeTransaction(address(mockSafe), 0, hex"", Enum.Operation.Call);
+
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
+
+    function testAllowGuardCall() public {
+        // Safe should be able to call the guard contract (for address book management)
+        // This should succeed even though the guard address is not in the address book
+        mockSafe.executeTransaction(address(pool), 0, hex"", Enum.Operation.Call);
+
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
+
+    function testSelfCallEmitsEvent() public {
+        // Test that self-calls emit the SelfCallAllowed event
+        vm.expectEmit(true, true, false, false);
+        emit SafeTxPool.SelfCallAllowed(address(mockSafe), address(mockSafe));
+
+        mockSafe.executeTransaction(address(mockSafe), 0, hex"", Enum.Operation.Call);
+    }
+
+    function testGuardCallEmitsEvent() public {
+        // Test that guard calls emit the GuardCallAllowed event
+        vm.expectEmit(true, true, false, false);
+        emit SafeTxPool.GuardCallAllowed(address(mockSafe), address(pool));
+
+        mockSafe.executeTransaction(address(pool), 0, hex"", Enum.Operation.Call);
+    }
 }
