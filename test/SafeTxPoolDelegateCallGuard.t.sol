@@ -12,12 +12,7 @@ contract MockSafeForDelegateCall {
         guard = _guard;
     }
 
-    function executeTransaction(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation
-    ) external {
+    function executeTransaction(address to, uint256 value, bytes calldata data, Enum.Operation operation) external {
         // Call checkTransaction on the guard
         guard.checkTransaction(
             to,
@@ -80,12 +75,7 @@ contract SafeTxPoolDelegateCallGuardTest is Test {
 
         // Attempt delegate call - should revert because delegate calls are disabled
         vm.expectRevert(abi.encodeWithSelector(SafeTxPool.DelegateCallDisabled.selector));
-        mockSafe.executeTransaction(
-            targetContract,
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(targetContract, 0, bytes(""), Enum.Operation.DelegateCall);
     }
 
     function testEnableDelegateCallAllowsAllTargets() public {
@@ -97,12 +87,7 @@ contract SafeTxPoolDelegateCallGuardTest is Test {
         assertTrue(pool.isDelegateCallEnabled(address(mockSafe)));
 
         // Delegate call should now succeed (no specific target restrictions)
-        mockSafe.executeTransaction(
-            targetContract,
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(targetContract, 0, bytes(""), Enum.Operation.DelegateCall);
     }
 
     function testDelegateCallWithTargetRestrictions() public {
@@ -117,21 +102,11 @@ contract SafeTxPoolDelegateCallGuardTest is Test {
         mockSafe.addDelegateCallTarget(targetContract);
 
         // Delegate call to allowed target should succeed
-        mockSafe.executeTransaction(
-            targetContract,
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(targetContract, 0, bytes(""), Enum.Operation.DelegateCall);
 
         // Delegate call to unauthorized target should fail
         vm.expectRevert(abi.encodeWithSelector(SafeTxPool.DelegateCallTargetNotAllowed.selector));
-        mockSafe.executeTransaction(
-            unauthorizedTarget,
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(unauthorizedTarget, 0, bytes(""), Enum.Operation.DelegateCall);
     }
 
     function testNormalCallsStillWork() public {
@@ -139,62 +114,32 @@ contract SafeTxPoolDelegateCallGuardTest is Test {
         mockSafe.addAddressBookEntry(targetContract, "Target Contract");
 
         // Normal calls should work regardless of delegate call settings
-        mockSafe.executeTransaction(
-            targetContract,
-            0,
-            bytes(""),
-            Enum.Operation.Call
-        );
+        mockSafe.executeTransaction(targetContract, 0, bytes(""), Enum.Operation.Call);
 
         // Enable delegate calls and add restrictions
         mockSafe.setDelegateCallEnabled(true);
         mockSafe.addDelegateCallTarget(targetContract);
 
         // Normal calls should still work
-        mockSafe.executeTransaction(
-            targetContract,
-            0,
-            bytes(""),
-            Enum.Operation.Call
-        );
+        mockSafe.executeTransaction(targetContract, 0, bytes(""), Enum.Operation.Call);
     }
 
     function testSelfCallsAlwaysAllowed() public {
         // Self calls should always be allowed regardless of delegate call settings
-        mockSafe.executeTransaction(
-            address(mockSafe),
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(address(mockSafe), 0, bytes(""), Enum.Operation.DelegateCall);
 
         // Even with delegate calls disabled
         mockSafe.setDelegateCallEnabled(false);
-        mockSafe.executeTransaction(
-            address(mockSafe),
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(address(mockSafe), 0, bytes(""), Enum.Operation.DelegateCall);
     }
 
     function testGuardContractCallsAlwaysAllowed() public {
         // Calls to the guard contract should always be allowed
-        mockSafe.executeTransaction(
-            address(pool),
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(address(pool), 0, bytes(""), Enum.Operation.DelegateCall);
 
         // Even with delegate calls disabled
         mockSafe.setDelegateCallEnabled(false);
-        mockSafe.executeTransaction(
-            address(pool),
-            0,
-            bytes(""),
-            Enum.Operation.DelegateCall
-        );
+        mockSafe.executeTransaction(address(pool), 0, bytes(""), Enum.Operation.DelegateCall);
     }
 
     function testOnlyOwnerCanModifySettings() public {
