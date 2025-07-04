@@ -404,15 +404,7 @@ contract SafeTxPoolGuardTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
             vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i
-            );
+            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
         }
 
         // Execute one transaction successfully
@@ -437,15 +429,7 @@ contract SafeTxPoolGuardTest is Test {
 
         // Propose transaction in the pool
         vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0
-        );
+        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         // Directly call checkAfterExecution (simulating Safe calling it)
         vm.prank(address(mockSafe));
@@ -463,15 +447,7 @@ contract SafeTxPoolGuardTest is Test {
 
         // Propose transaction in the pool
         vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0
-        );
+        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         // Directly call checkAfterExecution with failure
         vm.prank(address(mockSafe));
@@ -525,15 +501,7 @@ contract SafeTxPoolGuardTest is Test {
         for (uint256 i = 0; i < numTxs; i++) {
             txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
             vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i
-            );
+            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
         }
 
         // Verify all transactions are pending
@@ -559,15 +527,7 @@ contract SafeTxPoolGuardTest is Test {
         for (uint256 i = 0; i < 10; i++) {
             txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
             vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i
-            );
+            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
         }
 
         // Execute with alternating success/failure pattern
@@ -631,15 +591,7 @@ contract SafeTxPoolGuardTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
             vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i
-            );
+            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
             (,,,,,,, uint256 txId) = pool.getTxDetails(txHashes[i]);
             txIds[i] = txId;
         }
@@ -661,15 +613,7 @@ contract SafeTxPoolGuardTest is Test {
 
         // Propose transaction
         vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0
-        );
+        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         // Execute transaction - this internally calls this.markAsExecuted(txHash)
         // which should not cause reentrancy issues
