@@ -167,14 +167,15 @@ contract SafeTxPool is BaseGuard {
         if (msg.sender != safeTx.safe && msg.sender != address(this)) revert NotSafeWallet();
 
         uint256 txId = safeTx.txId;
+        address safe = safeTx.safe;
 
         // Remove from pending transactions for this Safe
-        _removeFromPending(safeTx.safe, txHash);
+        _removeFromPending(safe, txHash);
 
         // Delete transaction data
         delete transactions[txHash];
 
-        emit TransactionExecuted(txHash, safeTx.safe, txId);
+        emit TransactionExecuted(txHash, safe, txId);
     }
 
     /**
