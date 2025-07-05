@@ -301,11 +301,7 @@ contract SafeTxPool is BaseGuard {
      * @param signature Signature to recover from
      * @return Recovered signer address
      */
-    function _recoverSigner(bytes32 txHash, bytes memory signature)
-        internal
-        view
-        returns (address)
-    {
+    function _recoverSigner(bytes32 txHash, bytes memory signature) internal view returns (address) {
         bytes32 r;
         bytes32 s;
         uint8 v;
@@ -330,18 +326,10 @@ contract SafeTxPool is BaseGuard {
      * @param safeTx The Safe transaction data
      * @return The EIP-712 hash that should be signed
      */
-    function _getEIP712Hash(SafeTx storage safeTx)
-        internal
-        view
-        returns (bytes32)
-    {
+    function _getEIP712Hash(SafeTx storage safeTx) internal view returns (bytes32) {
         // EIP-712 domain separator
         bytes32 domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
-                block.chainid,
-                safeTx.safe
-            )
+            abi.encode(keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safeTx.safe)
         );
 
         // Safe transaction struct hash
