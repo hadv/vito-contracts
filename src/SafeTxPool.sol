@@ -301,7 +301,11 @@ contract SafeTxPool is BaseGuard {
      * @param signature Signature to recover from
      * @return Recovered signer address
      */
-    function _recoverSigner(bytes32 txHash, bytes memory signature) internal view returns (address) {
+    function _recoverSigner(bytes32 txHash, bytes memory signature)
+        internal
+        view
+        returns (address)
+    {
         bytes32 r;
         bytes32 s;
         uint8 v;
@@ -326,7 +330,11 @@ contract SafeTxPool is BaseGuard {
      * @param safeTx The Safe transaction data
      * @return The EIP-712 hash that should be signed
      */
-    function _getEIP712Hash(SafeTx storage safeTx) internal view returns (bytes32) {
+    function _getEIP712Hash(SafeTx storage safeTx)
+        internal
+        view
+        returns (bytes32)
+    {
         // EIP-712 domain separator
         bytes32 domainSeparator = keccak256(
             abi.encode(
@@ -339,7 +347,9 @@ contract SafeTxPool is BaseGuard {
         // Safe transaction struct hash
         bytes32 safeTxHash = keccak256(
             abi.encode(
-                keccak256("SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"),
+                keccak256(
+                    "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
+                ),
                 safeTx.to,
                 safeTx.value,
                 keccak256(safeTx.data),
@@ -354,13 +364,7 @@ contract SafeTxPool is BaseGuard {
         );
 
         // Final EIP-712 hash
-        return keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                domainSeparator,
-                safeTxHash
-            )
-        );
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, safeTxHash));
     }
 
     /**
