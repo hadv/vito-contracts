@@ -58,6 +58,50 @@ contract SafeTxPoolGuardTest is Test {
         vm.deal(owner2, 10 ether);
     }
 
+    /**
+     * @notice Generate EIP-712 signature for SafeTx
+     */
+    function _generateEIP712Signature(
+        uint256 privateKey,
+        address safe,
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        uint256 nonce
+    ) internal view returns (bytes memory signature) {
+        // EIP-712 domain separator
+        bytes32 domainSeparator = keccak256(
+            abi.encode(keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safe)
+        );
+
+        // Safe transaction struct hash
+        bytes32 safeTxHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
+                ),
+                to,
+                value,
+                keccak256(data),
+                operation,
+                0, // safeTxGas
+                0, // baseGas
+                0, // gasPrice
+                address(0), // gasToken
+                address(0), // refundReceiver
+                nonce
+            )
+        );
+
+        // Final EIP-712 hash
+        bytes32 eip712Hash = keccak256(abi.encodePacked("\x19\x01", domainSeparator, safeTxHash));
+
+        // Sign the EIP-712 hash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, eip712Hash);
+        signature = abi.encodePacked(r, s, v);
+    }
+
     function testGuardAutoMarkExecution() public {
         // Prepare transaction data
         bytes32 txHash = keccak256("test transaction");
@@ -319,9 +363,9 @@ contract SafeTxPoolGuardTest is Test {
             0 // nonce
         );
 
-        // Sign the transaction
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKey, txHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // Generate EIP-712 signature
+        bytes memory signature =
+            _generateEIP712Signature(ownerKey, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         vm.prank(owner);
         pool.signTx(txHash, signature);
