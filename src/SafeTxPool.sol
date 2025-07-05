@@ -296,12 +296,12 @@ contract SafeTxPool is BaseGuard {
     }
 
     /**
-     * @notice Recover signer from signature
-     * @param txHash Hash of the Safe transaction
+     * @notice Recover signer from EIP-712 signature
+     * @param txHash Hash of the Safe transaction (used to reconstruct EIP-712 hash)
      * @param signature Signature to recover from
      * @return Recovered signer address
      */
-    function _recoverSigner(bytes32 txHash, bytes memory signature) internal pure returns (address) {
+    function _recoverSigner(bytes32 txHash, bytes memory signature) internal view returns (address) {
         bytes32 r;
         bytes32 s;
         uint8 v;
@@ -312,7 +312,47 @@ contract SafeTxPool is BaseGuard {
             v := byte(0, mload(add(signature, 96)))
         }
 
-        return ecrecover(txHash, v, r, s);
+        // Get the transaction details to reconstruct the EIP-712 hash
+        SafeTx storage safeTx = transactions[txHash];
+
+        // Reconstruct the EIP-712 hash that was actually signed
+        bytes32 eip712Hash = _getEIP712Hash(safeTx);
+
+        return ecrecover(eip712Hash, v, r, s);
+    }
+
+    /**
+     * @notice Reconstruct the EIP-712 hash for a Safe transaction
+     * @param safeTx The Safe transaction data
+     * @return The EIP-712 hash that should be signed
+     */
+    function _getEIP712Hash(SafeTx storage safeTx) internal view returns (bytes32) {
+        // EIP-712 domain separator
+        bytes32 domainSeparator = keccak256(
+            abi.encode(keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safeTx.safe)
+        );
+
+        // Safe transaction struct hash
+        bytes32 safeTxHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
+                ),
+                safeTx.to,
+                safeTx.value,
+                keccak256(safeTx.data),
+                safeTx.operation,
+                0, // safeTxGas
+                0, // baseGas
+                0, // gasPrice
+                address(0), // gasToken
+                address(0), // refundReceiver
+                safeTx.nonce
+            )
+        );
+
+        // Final EIP-712 hash
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, safeTxHash));
     }
 
     /**
