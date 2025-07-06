@@ -7,6 +7,8 @@ import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 contract SafeTxPoolTest is Test {
     event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
+    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
+    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
 
     SafeTxPool public pool;
     address public safe;
@@ -234,8 +236,15 @@ contract SafeTxPoolTest is Test {
         vm.prank(owner1);
         pool.proposeTx(txHash, safe, recipient, 0, data, Enum.Operation.Call, 0);
 
-        // Delete transaction
+        // Get transaction ID for event verification
+        (,,,,,,, uint256 txId) = pool.getTxDetails(txHash);
+
+        // Delete transaction and expect events
         vm.prank(owner1);
+        vm.expectEmit(true, true, true, true);
+        emit TransactionRemovedFromPending(txHash, safe, txId, "deleted_by_proposer");
+        vm.expectEmit(true, true, true, true);
+        emit TransactionDeleted(txHash, safe, owner1, txId);
         pool.deleteTx(txHash);
 
         // Verify removed from pending
@@ -406,6 +415,54 @@ contract SafeTxPoolTest is Test {
         assertEq(proposer_, owner2);
         assertEq(safe_, safe);
         assertEq(nonce_, 1);
+    }
+
+    function testBatchRemovalFromPendingOnExecution() public {
+        // Create multiple transactions with the same nonce
+        bytes32 txHash1 = keccak256("test transaction 1");
+        bytes32 txHash2 = keccak256("test transaction 2");
+        bytes32 txHash3 = keccak256("test transaction 3");
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        // Propose all transactions with nonce 0
+        vm.prank(owner1);
+        pool.proposeTx(txHash1, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        vm.prank(owner2);
+        pool.proposeTx(txHash2, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        vm.prank(owner1);
+        pool.proposeTx(txHash3, safe, recipient, 0, data, Enum.Operation.Call, 0);
+
+        // Verify all are pending
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(safe, 0, 5);
+        assertEq(pendingTxs.length, 3);
+
+        // Get transaction IDs for event verification
+        (,,,,,,, uint256 txId1) = pool.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = pool.getTxDetails(txHash2);
+        (,,,,,,, uint256 txId3) = pool.getTxDetails(txHash3);
+
+        // Mark one transaction as executed - should remove all with same nonce
+        vm.prank(safe);
+
+        // Expect individual removal events for each transaction (in reverse order due to array iteration)
+        vm.expectEmit(true, true, true, true);
+        emit TransactionRemovedFromPending(txHash3, safe, txId3, "nonce_conflict");
+        vm.expectEmit(true, true, true, true);
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_conflict");
+        vm.expectEmit(true, true, true, true);
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_conflict");
+
+        // Expect batch removal event
+        vm.expectEmit(true, true, true, true);
+        emit BatchTransactionsRemovedFromPending(safe, 0, 3, "nonce_conflict");
+
+        pool.markAsExecuted(txHash1);
+
+        // Verify all transactions are removed from pending
+        pendingTxs = pool.getPendingTxHashes(safe, 0, 5);
+        assertEq(pendingTxs.length, 0);
     }
 
     function testDeleteTxWithMultiplePendingTxs() public {

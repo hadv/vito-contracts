@@ -26,6 +26,8 @@ contract MockSafe {
 
 contract SafeTxPoolGuardTest is Test {
     event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
+    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
+    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
     event SelfCallAllowed(address indexed safe, address indexed to);
     event GuardCallAllowed(address indexed safe, address indexed guard);
 
@@ -386,6 +388,28 @@ contract SafeTxPoolGuardTest is Test {
         (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
         assertEq(txProposer, address(0));
         assertEq(txSafe, address(0));
+    }
+
+    function testGuardEmitsRemovalEvents() public {
+        // Propose transaction
+        bytes32 txHash = keccak256("removal event test");
+        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
+
+        vm.prank(owner);
+        pool.proposeTx(txHash, address(mockSafe), recipient, 0, data, Enum.Operation.Call, 0);
+
+        // Get transaction ID for event verification
+        (,,,,,,, uint256 txId) = pool.getTxDetails(txHash);
+
+        // Execute via guard and expect removal event
+        vm.expectEmit(true, true, true, true);
+        emit TransactionRemovedFromPending(txHash, address(mockSafe), txId, "nonce_conflict");
+
+        mockSafe.executeTransaction(txHash, true);
+
+        // Verify transaction was removed
+        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
+        assertEq(pendingTxs.length, 0);
     }
 
     function testGuardStateConsistencyAfterExecution() public {

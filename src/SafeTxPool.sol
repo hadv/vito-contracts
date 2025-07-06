@@ -66,6 +66,10 @@ contract SafeTxPool is BaseGuard {
 
     event TransactionDeleted(bytes32 indexed txHash, address indexed safe, address indexed proposer, uint256 txId);
 
+    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
+
+    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
+
     event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
     event SelfCallAllowed(address indexed safe, address indexed to);
@@ -280,6 +284,7 @@ contract SafeTxPool is BaseGuard {
     function _removeFromPending(address safe, bytes32 txHash) internal {
         bytes32[] storage pendingTxs = pendingTxsBySafe[safe];
         uint256 targetNonce = transactions[txHash].nonce;
+        uint256 removedCount = 0;
 
         // Iterate through pending transactions from end to start to handle removals safely
         for (uint256 i = pendingTxs.length; i > 0; i--) {
@@ -288,10 +293,22 @@ contract SafeTxPool is BaseGuard {
 
             // Check if current transaction has the same nonce
             if (transactions[currentTxHash].nonce == targetNonce) {
+                // Get transaction details before removal for event emission
+                uint256 txId = transactions[currentTxHash].txId;
+
                 // Move last element to current position and pop
                 pendingTxs[currentIndex] = pendingTxs[pendingTxs.length - 1];
                 pendingTxs.pop();
+
+                // Emit event for individual transaction removal
+                emit TransactionRemovedFromPending(currentTxHash, safe, txId, "nonce_conflict");
+                removedCount++;
             }
+        }
+
+        // Emit batch removal event if multiple transactions were removed
+        if (removedCount > 1) {
+            emit BatchTransactionsRemovedFromPending(safe, targetNonce, removedCount, "nonce_conflict");
         }
     }
 
@@ -381,6 +398,9 @@ contract SafeTxPool is BaseGuard {
                 // Move last element to current position and pop
                 pendingTxs[currentIndex] = pendingTxs[pendingTxs.length - 1];
                 pendingTxs.pop();
+
+                // Emit event for transaction removal from pending
+                emit TransactionRemovedFromPending(txHash, safe, txId, "deleted_by_proposer");
                 break;
             }
         }
