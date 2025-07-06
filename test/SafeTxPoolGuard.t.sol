@@ -403,7 +403,7 @@ contract SafeTxPoolGuardTest is Test {
 
         // Execute via guard and expect removal event
         vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash, address(mockSafe), txId, "nonce_conflict");
+        emit TransactionRemovedFromPending(txHash, address(mockSafe), txId, "nonce_consumed");
 
         mockSafe.executeTransaction(txHash, true);
 

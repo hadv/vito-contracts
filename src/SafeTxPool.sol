@@ -301,14 +301,15 @@ contract SafeTxPool is BaseGuard {
                 pendingTxs.pop();
 
                 // Emit event for individual transaction removal
-                emit TransactionRemovedFromPending(currentTxHash, safe, txId, "nonce_conflict");
+                // All transactions with the same nonce are removed due to nonce consumption
+                emit TransactionRemovedFromPending(currentTxHash, safe, txId, "nonce_consumed");
                 removedCount++;
             }
         }
 
         // Emit batch removal event if multiple transactions were removed
         if (removedCount > 1) {
-            emit BatchTransactionsRemovedFromPending(safe, targetNonce, removedCount, "nonce_conflict");
+            emit BatchTransactionsRemovedFromPending(safe, targetNonce, removedCount, "nonce_consumed");
         }
     }
 
@@ -400,7 +401,7 @@ contract SafeTxPool is BaseGuard {
                 pendingTxs.pop();
 
                 // Emit event for transaction removal from pending
-                emit TransactionRemovedFromPending(txHash, safe, txId, "deleted_by_proposer");
+                emit TransactionRemovedFromPending(txHash, safe, txId, "deleted");
                 break;
             }
         }

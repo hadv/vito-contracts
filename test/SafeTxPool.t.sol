@@ -242,7 +242,7 @@ contract SafeTxPoolTest is Test {
         // Delete transaction and expect events
         vm.prank(owner1);
         vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash, safe, txId, "deleted_by_proposer");
+        emit TransactionRemovedFromPending(txHash, safe, txId, "deleted");
         vm.expectEmit(true, true, true, true);
         emit TransactionDeleted(txHash, safe, owner1, txId);
         pool.deleteTx(txHash);
@@ -447,16 +447,17 @@ contract SafeTxPoolTest is Test {
         vm.prank(safe);
 
         // Expect individual removal events for each transaction (in reverse order due to array iteration)
+        // All transactions with the same nonce are removed because the nonce is consumed
         vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash3, safe, txId3, "nonce_conflict");
+        emit TransactionRemovedFromPending(txHash3, safe, txId3, "nonce_consumed");
         vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_conflict");
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_consumed");
         vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_conflict");
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_consumed");
 
         // Expect batch removal event
         vm.expectEmit(true, true, true, true);
-        emit BatchTransactionsRemovedFromPending(safe, 0, 3, "nonce_conflict");
+        emit BatchTransactionsRemovedFromPending(safe, 0, 3, "nonce_consumed");
 
         pool.markAsExecuted(txHash1);
 
