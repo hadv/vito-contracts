@@ -7,11 +7,12 @@ import {BaseGuard} from "@safe-global/safe-contracts/contracts/base/GuardManager
 contract SafeTxPool is BaseGuard {
     // Enum for different transaction types
     enum TransactionType {
-        NATIVE_TRANSFER,      // ETH transfer with no data
-        ERC20_TRANSFER,       // ERC20 token transfer
-        ERC20_TRANSFER_FROM,  // ERC20 token transferFrom
+        NATIVE_TRANSFER, // ETH transfer with no data
+        ERC20_TRANSFER, // ERC20 token transfer
+        ERC20_TRANSFER_FROM, // ERC20 token transferFrom
         CONTRACT_INTERACTION, // General contract interaction
-        DELEGATE_CALL        // Delegate call operation
+        DELEGATE_CALL // Delegate call operation
+
     }
 
     // Struct to hold transaction details
@@ -666,7 +667,7 @@ contract SafeTxPool is BaseGuard {
      * @return TransactionType The classified transaction type
      */
     function _classifyTransaction(
-        address,  // to
+        address, // to
         uint256 value,
         bytes memory data,
         Enum.Operation operation
@@ -682,7 +683,8 @@ contract SafeTxPool is BaseGuard {
         }
 
         // Check for ERC20 transfers
-        if (data.length >= 68) { // Minimum length for ERC20 function calls
+        if (data.length >= 68) {
+            // Minimum length for ERC20 function calls
             bytes4 selector = bytes4(data);
 
             // ERC20 transfer(address,uint256) - 0xa9059cbb
@@ -710,7 +712,7 @@ contract SafeTxPool is BaseGuard {
     function _validateTransaction(
         address safe,
         address to,
-        uint256,  // value
+        uint256, // value
         bytes memory data,
         TransactionType txType
     ) internal view {
@@ -718,8 +720,7 @@ contract SafeTxPool is BaseGuard {
             // For native transfers, validate the recipient address
             int256 index = _findAddressBookEntry(safe, to);
             if (index < 0) revert AddressNotInAddressBook();
-        }
-        else if (txType == TransactionType.ERC20_TRANSFER) {
+        } else if (txType == TransactionType.ERC20_TRANSFER) {
             // For ERC20 transfers, validate both the token contract and the recipient
             // First check if the token contract is trusted
             bool isTokenTrusted = trustedContracts[safe][to];
@@ -743,8 +744,7 @@ contract SafeTxPool is BaseGuard {
                 int256 recipientIndex = _findAddressBookEntry(safe, recipient);
                 if (recipientIndex < 0) revert RecipientNotInAddressBook();
             }
-        }
-        else if (txType == TransactionType.ERC20_TRANSFER_FROM) {
+        } else if (txType == TransactionType.ERC20_TRANSFER_FROM) {
             // For ERC20 transferFrom, validate both the token contract and the recipient
             // First check if the token contract is trusted
             bool isTokenTrusted = trustedContracts[safe][to];
@@ -768,8 +768,7 @@ contract SafeTxPool is BaseGuard {
                 int256 recipientIndex = _findAddressBookEntry(safe, recipient);
                 if (recipientIndex < 0) revert RecipientNotInAddressBook();
             }
-        }
-        else if (txType == TransactionType.CONTRACT_INTERACTION) {
+        } else if (txType == TransactionType.CONTRACT_INTERACTION) {
             // For general contract interactions, validate the contract address
             int256 index = _findAddressBookEntry(safe, to);
             if (index < 0) revert AddressNotInAddressBook();
