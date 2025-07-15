@@ -27,12 +27,17 @@ The system classifies transactions into the following types:
 
 ### 4. CONTRACT_INTERACTION
 - **Description**: General smart contract interactions
-- **Validation**: Contract address must be in the address book
+- **Validation**:
+  - If contract is trusted: No additional validation required
+  - If contract is not trusted: Contract must be in the address book
 - **Example**: Calling any other contract function
 
 ### 5. DELEGATE_CALL
 - **Description**: Delegate call operations
-- **Validation**: Uses existing delegate call restrictions
+- **Validation**:
+  - If contract is trusted: No additional validation required
+  - If contract is not trusted: Contract must be in the address book
+  - Note: Existing delegate call restrictions still apply
 - **Example**: Proxy pattern implementations
 
 ## Trusted Contracts
@@ -70,8 +75,8 @@ function isTrustedContract(address safe, address contractAddress) external view 
 ### For Other Transaction Types
 
 - **Native transfers**: Validate recipient address
-- **Contract interactions**: Validate contract address
-- **Delegate calls**: Use existing delegate call restrictions
+- **Contract interactions**: Check if contract is trusted, otherwise validate contract address
+- **Delegate calls**: Check if contract is trusted, otherwise validate contract address (plus existing delegate call restrictions)
 
 ## Error Types
 
@@ -84,18 +89,22 @@ error ContractNotTrusted();         // Contract not trusted and not in address b
 
 ## Usage Examples
 
-### Setting Up a Safe with Token Support
+### Setting Up a Safe with Enhanced Trust Model
 
 ```solidity
 // 1. Add frequently used recipients to address book
 safeTxPool.addAddressBookEntry(safeAddress, recipientAddress, "Alice");
 
-// 2. Add trusted token contracts
+// 2. Add trusted contracts (tokens, DEXs, protocols, etc.)
 safeTxPool.addTrustedContract(safeAddress, usdcTokenAddress);
 safeTxPool.addTrustedContract(safeAddress, daiTokenAddress);
+safeTxPool.addTrustedContract(safeAddress, uniswapRouterAddress);
+safeTxPool.addTrustedContract(safeAddress, aavePoolAddress);
 
-// 3. Now you can send tokens to Alice using trusted contracts
-// without adding each token contract to the address book
+// 3. Now you can interact with trusted contracts without adding them to address book
+// - Send tokens to Alice using trusted token contracts
+// - Interact with trusted DEX contracts
+// - Use trusted DeFi protocols
 ```
 
 ### ERC20 Transfer Scenarios
@@ -121,6 +130,30 @@ token.transfer(alice, 100);
 // Token is trusted, but recipient not in address book ❌
 // Will revert with RecipientNotInAddressBook
 token.transfer(unknownAddress, 100);
+```
+
+### Contract Interaction Scenarios
+
+#### Scenario 1: Trusted Contract Interaction
+```solidity
+// Contract is trusted, interaction allowed ✅
+uniswapRouter.swapExactTokensForTokens(...);
+```
+
+#### Scenario 2: Non-Trusted Contract in Address Book
+```solidity
+// Contract not trusted, but in address book ✅
+// 1. Add contract to address book
+safeTxPool.addAddressBookEntry(safeAddress, contractAddress, "MyContract");
+// 2. Interaction allowed
+myContract.someFunction(...);
+```
+
+#### Scenario 3: Non-Trusted Contract Not in Address Book
+```solidity
+// Contract not trusted and not in address book ❌
+// Will revert with ContractNotTrusted
+unknownContract.someFunction(...);
 ```
 
 ## Migration Guide

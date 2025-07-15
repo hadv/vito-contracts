@@ -180,4 +180,87 @@ contract SafeTxPoolTypeSpecificValidationTest is Test {
         vm.expectRevert(SafeTxPool.ContractNotTrusted.selector);
         mockSafe.executeTransaction(tokenAddress, 0, data, Enum.Operation.Call);
     }
+
+    // Test contract interaction with trusted contract
+    function testContractInteractionWithTrustedContract() public {
+        // Add token as trusted contract
+        vm.prank(address(mockSafe));
+        pool.addTrustedContract(address(mockSafe), tokenAddress);
+
+        // Create approve data (general contract interaction)
+        bytes memory data = abi.encodeWithSelector(token.approve.selector, recipient, 100 * 10 ** 18);
+
+        // Should succeed since token is trusted
+        mockSafe.executeTransaction(tokenAddress, 0, data, Enum.Operation.Call);
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
+
+    // Test contract interaction with non-trusted contract not in address book
+    function testRevertContractInteractionWithNonTrustedContract() public {
+        // Create approve data (general contract interaction)
+        bytes memory data = abi.encodeWithSelector(token.approve.selector, recipient, 100 * 10 ** 18);
+
+        // Should revert since token is not trusted and not in address book
+        vm.expectRevert(SafeTxPool.ContractNotTrusted.selector);
+        mockSafe.executeTransaction(tokenAddress, 0, data, Enum.Operation.Call);
+    }
+
+    // Test contract interaction with non-trusted contract in address book
+    function testContractInteractionWithNonTrustedContractInAddressBook() public {
+        // Add token to address book
+        vm.prank(address(mockSafe));
+        pool.addAddressBookEntry(address(mockSafe), tokenAddress, bytes32("Token"));
+
+        // Create approve data (general contract interaction)
+        bytes memory data = abi.encodeWithSelector(token.approve.selector, recipient, 100 * 10 ** 18);
+
+        // Should succeed since token is in address book
+        mockSafe.executeTransaction(tokenAddress, 0, data, Enum.Operation.Call);
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
+
+    // Test delegate call with trusted contract
+    function testDelegateCallWithTrustedContract() public {
+        // Enable delegate calls for the Safe
+        vm.prank(address(mockSafe));
+        pool.setDelegateCallEnabled(address(mockSafe), true);
+
+        // Add token as trusted contract
+        vm.prank(address(mockSafe));
+        pool.addTrustedContract(address(mockSafe), tokenAddress);
+
+        // Should succeed since token is trusted (no delegate call target restrictions needed)
+        mockSafe.executeTransaction(tokenAddress, 0, hex"", Enum.Operation.DelegateCall);
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
+
+    // Test delegate call with non-trusted contract not in address book
+    function testRevertDelegateCallWithNonTrustedContract() public {
+        // Enable delegate calls for the Safe
+        vm.prank(address(mockSafe));
+        pool.setDelegateCallEnabled(address(mockSafe), true);
+
+        // Should revert since token is not trusted and not in address book
+        vm.expectRevert(SafeTxPool.ContractNotTrusted.selector);
+        mockSafe.executeTransaction(tokenAddress, 0, hex"", Enum.Operation.DelegateCall);
+    }
+
+    // Test delegate call with non-trusted contract in address book
+    function testDelegateCallWithNonTrustedContractInAddressBook() public {
+        // Enable delegate calls for the Safe
+        vm.prank(address(mockSafe));
+        pool.setDelegateCallEnabled(address(mockSafe), true);
+
+        // Add token to address book
+        vm.prank(address(mockSafe));
+        pool.addAddressBookEntry(address(mockSafe), tokenAddress, bytes32("Token"));
+
+        // Should succeed since token is in address book
+        mockSafe.executeTransaction(tokenAddress, 0, hex"", Enum.Operation.DelegateCall);
+        // If we got here without reverting, the test passes
+        assertTrue(true);
+    }
 }

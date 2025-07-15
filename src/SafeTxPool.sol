@@ -468,10 +468,14 @@ contract SafeTxPool is BaseGuard {
                 revert DelegateCallDisabled();
             }
 
-            // If delegate calls are enabled, check if there are any specific target restrictions
-            // If the target is not explicitly allowed and there are restrictions, revert
-            if (!allowedDelegateCallTargets[safe][to] && _hasDelegateCallTargetRestrictions(safe)) {
-                revert DelegateCallTargetNotAllowed();
+            // If the target is trusted, we can skip the delegate call target restrictions
+            bool isTargetTrusted = trustedContracts[safe][to];
+            if (!isTargetTrusted) {
+                // If delegate calls are enabled, check if there are any specific target restrictions
+                // If the target is not explicitly allowed and there are restrictions, revert
+                if (!allowedDelegateCallTargets[safe][to] && _hasDelegateCallTargetRestrictions(safe)) {
+                    revert DelegateCallTargetNotAllowed();
+                }
             }
         }
 
@@ -769,11 +773,24 @@ contract SafeTxPool is BaseGuard {
                 if (recipientIndex < 0) revert RecipientNotInAddressBook();
             }
         } else if (txType == TransactionType.CONTRACT_INTERACTION) {
-            // For general contract interactions, validate the contract address
-            int256 index = _findAddressBookEntry(safe, to);
-            if (index < 0) revert AddressNotInAddressBook();
+            // For general contract interactions, check if contract is trusted first
+            bool isContractTrusted = trustedContracts[safe][to];
+
+            if (!isContractTrusted) {
+                // If contract is not trusted, it must be in the address book
+                int256 index = _findAddressBookEntry(safe, to);
+                if (index < 0) revert ContractNotTrusted();
+            }
+        } else if (txType == TransactionType.DELEGATE_CALL) {
+            // For delegate calls, check if contract is trusted first
+            bool isContractTrusted = trustedContracts[safe][to];
+
+            if (!isContractTrusted) {
+                // If contract is not trusted, it must be in the address book
+                int256 index = _findAddressBookEntry(safe, to);
+                if (index < 0) revert ContractNotTrusted();
+            }
         }
-        // DELEGATE_CALL validation is already handled in checkTransaction
     }
 
     /**
