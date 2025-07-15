@@ -5,6 +5,15 @@ import {Enum} from "@safe-global/safe-contracts/contracts/common/Enum.sol";
 import {BaseGuard} from "@safe-global/safe-contracts/contracts/base/GuardManager.sol";
 
 contract SafeTxPool is BaseGuard {
+    // Enum for different transaction types
+    enum TransactionType {
+        NATIVE_TRANSFER,      // ETH transfer with no data
+        ERC20_TRANSFER,       // ERC20 token transfer
+        ERC20_TRANSFER_FROM,  // ERC20 token transferFrom
+        CONTRACT_INTERACTION, // General contract interaction
+        DELEGATE_CALL        // Delegate call operation
+    }
+
     // Struct to hold transaction details
     struct SafeTx {
         address safe;
@@ -48,6 +57,9 @@ contract SafeTxPool is BaseGuard {
     mapping(address => mapping(address => bool)) private allowedDelegateCallTargets;
     mapping(address => bool) private hasTargetRestrictions;
 
+    // Contract whitelist for trusted contracts (like token contracts)
+    mapping(address => mapping(address => bool)) private trustedContracts;
+
     event TransactionProposed(
         bytes32 indexed txHash,
         address indexed proposer,
@@ -77,6 +89,9 @@ contract SafeTxPool is BaseGuard {
     event DelegateCallToggled(address indexed safe, bool enabled);
     event DelegateCallTargetAdded(address indexed safe, address indexed target);
     event DelegateCallTargetRemoved(address indexed safe, address indexed target);
+    event TrustedContractAdded(address indexed safe, address indexed contractAddress);
+    event TrustedContractRemoved(address indexed safe, address indexed contractAddress);
+    event TransactionValidated(address indexed safe, address indexed to, TransactionType txType);
 
     error AlreadySigned();
     error TransactionNotFound();
@@ -88,6 +103,8 @@ contract SafeTxPool is BaseGuard {
     error AddressNotInAddressBook();
     error DelegateCallDisabled();
     error DelegateCallTargetNotAllowed();
+    error RecipientNotInAddressBook();
+    error ContractNotTrusted();
 
     /**
      * @notice Propose a new Safe transaction
@@ -418,8 +435,8 @@ contract SafeTxPool is BaseGuard {
      */
     function checkTransaction(
         address to,
-        uint256,
-        bytes memory,
+        uint256 value,
+        bytes memory data,
         Enum.Operation operation,
         uint256,
         uint256,
@@ -457,11 +474,11 @@ contract SafeTxPool is BaseGuard {
             }
         }
 
-        // Check if the destination address is in the Safe's address book
-        int256 index = _findAddressBookEntry(safe, to);
+        // Determine transaction type and validate accordingly
+        TransactionType txType = _classifyTransaction(to, value, data, operation);
+        _validateTransaction(safe, to, value, data, txType);
 
-        // If the address is not in the address book, revert
-        if (index < 0) revert AddressNotInAddressBook();
+        emit TransactionValidated(safe, to, txType);
     }
 
     /**
@@ -640,5 +657,162 @@ contract SafeTxPool is BaseGuard {
      */
     function _hasDelegateCallTargetRestrictions(address safe) internal view returns (bool) {
         return hasTargetRestrictions[safe];
+    }
+
+    /**
+     * @notice Classify transaction type based on transaction parameters
+     * @param data Transaction data
+     * @param operation Operation type
+     * @return TransactionType The classified transaction type
+     */
+    function _classifyTransaction(
+        address,  // to
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal pure returns (TransactionType) {
+        // Check for delegate call first
+        if (operation == Enum.Operation.DelegateCall) {
+            return TransactionType.DELEGATE_CALL;
+        }
+
+        // Check for native ETH transfer (no data or empty data)
+        if (value > 0 && data.length == 0) {
+            return TransactionType.NATIVE_TRANSFER;
+        }
+
+        // Check for ERC20 transfers
+        if (data.length >= 68) { // Minimum length for ERC20 function calls
+            bytes4 selector = bytes4(data);
+
+            // ERC20 transfer(address,uint256) - 0xa9059cbb
+            if (selector == 0xa9059cbb) {
+                return TransactionType.ERC20_TRANSFER;
+            }
+
+            // ERC20 transferFrom(address,address,uint256) - 0x23b872dd
+            if (selector == 0x23b872dd && data.length >= 100) {
+                return TransactionType.ERC20_TRANSFER_FROM;
+            }
+        }
+
+        // Default to general contract interaction
+        return TransactionType.CONTRACT_INTERACTION;
+    }
+
+    /**
+     * @notice Validate transaction based on its type
+     * @param safe The Safe wallet address
+     * @param to Destination address
+     * @param data Transaction data
+     * @param txType Transaction type
+     */
+    function _validateTransaction(
+        address safe,
+        address to,
+        uint256,  // value
+        bytes memory data,
+        TransactionType txType
+    ) internal view {
+        if (txType == TransactionType.NATIVE_TRANSFER) {
+            // For native transfers, validate the recipient address
+            int256 index = _findAddressBookEntry(safe, to);
+            if (index < 0) revert AddressNotInAddressBook();
+        }
+        else if (txType == TransactionType.ERC20_TRANSFER) {
+            // For ERC20 transfers, validate both the token contract and the recipient
+            // First check if the token contract is trusted
+            bool isTokenTrusted = trustedContracts[safe][to];
+
+            // Extract recipient from ERC20 transfer data
+            address recipient;
+            assembly {
+                // Skip 4 bytes function selector + 12 bytes padding
+                recipient := mload(add(data, 36))
+            }
+
+            // If token contract is trusted, only validate recipient
+            if (isTokenTrusted) {
+                int256 recipientIndex = _findAddressBookEntry(safe, recipient);
+                if (recipientIndex < 0) revert RecipientNotInAddressBook();
+            } else {
+                // If token contract is not trusted, both contract and recipient must be in address book
+                int256 contractIndex = _findAddressBookEntry(safe, to);
+                if (contractIndex < 0) revert ContractNotTrusted();
+
+                int256 recipientIndex = _findAddressBookEntry(safe, recipient);
+                if (recipientIndex < 0) revert RecipientNotInAddressBook();
+            }
+        }
+        else if (txType == TransactionType.ERC20_TRANSFER_FROM) {
+            // For ERC20 transferFrom, validate both the token contract and the recipient
+            // First check if the token contract is trusted
+            bool isTokenTrusted = trustedContracts[safe][to];
+
+            // Extract recipient from ERC20 transferFrom data
+            address recipient;
+            assembly {
+                // Skip 4 bytes function selector + 12 bytes padding + 32 bytes (from address)
+                recipient := mload(add(data, 68))
+            }
+
+            // If token contract is trusted, only validate recipient
+            if (isTokenTrusted) {
+                int256 recipientIndex = _findAddressBookEntry(safe, recipient);
+                if (recipientIndex < 0) revert RecipientNotInAddressBook();
+            } else {
+                // If token contract is not trusted, both contract and recipient must be in address book
+                int256 contractIndex = _findAddressBookEntry(safe, to);
+                if (contractIndex < 0) revert ContractNotTrusted();
+
+                int256 recipientIndex = _findAddressBookEntry(safe, recipient);
+                if (recipientIndex < 0) revert RecipientNotInAddressBook();
+            }
+        }
+        else if (txType == TransactionType.CONTRACT_INTERACTION) {
+            // For general contract interactions, validate the contract address
+            int256 index = _findAddressBookEntry(safe, to);
+            if (index < 0) revert AddressNotInAddressBook();
+        }
+        // DELEGATE_CALL validation is already handled in checkTransaction
+    }
+
+    /**
+     * @notice Add a trusted contract for a Safe
+     * @param safe The Safe wallet address
+     * @param contractAddress The contract address to trust
+     */
+    function addTrustedContract(address safe, address contractAddress) external {
+        // Only the Safe wallet itself can modify its trusted contracts
+        if (msg.sender != safe) revert NotSafeWallet();
+
+        // Validate contract address
+        if (contractAddress == address(0)) revert InvalidAddress();
+
+        trustedContracts[safe][contractAddress] = true;
+        emit TrustedContractAdded(safe, contractAddress);
+    }
+
+    /**
+     * @notice Remove a trusted contract for a Safe
+     * @param safe The Safe wallet address
+     * @param contractAddress The contract address to remove from trusted list
+     */
+    function removeTrustedContract(address safe, address contractAddress) external {
+        // Only the Safe wallet itself can modify its trusted contracts
+        if (msg.sender != safe) revert NotSafeWallet();
+
+        trustedContracts[safe][contractAddress] = false;
+        emit TrustedContractRemoved(safe, contractAddress);
+    }
+
+    /**
+     * @notice Check if a contract is trusted by a Safe
+     * @param safe The Safe wallet address
+     * @param contractAddress The contract address to check
+     * @return isTrusted Whether the contract is trusted
+     */
+    function isTrustedContract(address safe, address contractAddress) external view returns (bool) {
+        return trustedContracts[safe][contractAddress];
     }
 }
