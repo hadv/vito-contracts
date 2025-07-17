@@ -107,6 +107,7 @@ contract SafeTxPool is BaseGuard {
         if (msg.sender != safe) revert NotSafeWallet();
         _;
     }
+
     error DelegateCallDisabled();
     error DelegateCallTargetNotAllowed();
     error RecipientNotInAddressBook();
@@ -523,7 +524,6 @@ contract SafeTxPool is BaseGuard {
      * @param name Name associated with the address (32 bytes)
      */
     function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external onlySafe(safe) {
-
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
 
@@ -547,7 +547,6 @@ contract SafeTxPool is BaseGuard {
      * @param walletAddress The wallet address to remove
      */
     function removeAddressBookEntry(address safe, address walletAddress) external onlySafe(safe) {
-
         int256 index = _findAddressBookEntry(safe, walletAddress);
 
         if (index < 0) revert AddressNotFound();
@@ -600,7 +599,6 @@ contract SafeTxPool is BaseGuard {
      * @param enabled Whether delegate calls should be enabled
      */
     function setDelegateCallEnabled(address safe, bool enabled) external onlySafe(safe) {
-
         delegateCallEnabled[safe] = enabled;
         emit DelegateCallToggled(safe, enabled);
     }
@@ -611,7 +609,6 @@ contract SafeTxPool is BaseGuard {
      * @param target The target address to allow for delegate calls
      */
     function addDelegateCallTarget(address safe, address target) external onlySafe(safe) {
-
         // Validate target address
         if (target == address(0)) revert InvalidAddress();
 
@@ -626,7 +623,6 @@ contract SafeTxPool is BaseGuard {
      * @param target The target address to remove from allowed delegate calls
      */
     function removeDelegateCallTarget(address safe, address target) external onlySafe(safe) {
-
         allowedDelegateCallTargets[safe][target] = false;
         emit DelegateCallTargetRemoved(safe, target);
     }
@@ -794,7 +790,6 @@ contract SafeTxPool is BaseGuard {
      * @param contractAddress The contract address to trust
      */
     function addTrustedContract(address safe, address contractAddress) external onlySafe(safe) {
-
         // Validate contract address
         if (contractAddress == address(0)) revert InvalidAddress();
 
@@ -808,7 +803,6 @@ contract SafeTxPool is BaseGuard {
      * @param contractAddress The contract address to remove from trusted list
      */
     function removeTrustedContract(address safe, address contractAddress) external onlySafe(safe) {
-
         trustedContracts[safe][contractAddress] = false;
         emit TrustedContractRemoved(safe, contractAddress);
     }
