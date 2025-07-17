@@ -58,6 +58,10 @@ contract SafeTxPool is BaseGuard {
     mapping(address => mapping(address => bool)) private allowedDelegateCallTargets;
     mapping(address => bool) private hasTargetRestrictions;
 
+    // Arrays to track allowed targets for efficient retrieval
+    mapping(address => address[]) private delegateCallTargetsList;
+    mapping(address => mapping(address => uint256)) private delegateCallTargetIndex;
+
     // Contract whitelist for trusted contracts (like token contracts)
     mapping(address => mapping(address => bool)) private trustedContracts;
 
@@ -618,8 +622,18 @@ contract SafeTxPool is BaseGuard {
         // Validate target address
         if (target == address(0)) revert InvalidAddress();
 
+        // Check if target is already allowed to avoid duplicates
+        if (allowedDelegateCallTargets[safe][target]) {
+            return; // Target already exists, no need to add again
+        }
+
         allowedDelegateCallTargets[safe][target] = true;
         hasTargetRestrictions[safe] = true;
+
+        // Add to the targets list for efficient retrieval
+        delegateCallTargetsList[safe].push(target);
+        delegateCallTargetIndex[safe][target] = delegateCallTargetsList[safe].length - 1;
+
         emit DelegateCallTargetAdded(safe, target);
     }
 
@@ -632,7 +646,28 @@ contract SafeTxPool is BaseGuard {
         // Only the Safe wallet itself can modify its delegate call settings
         if (msg.sender != safe) revert NotSafeWallet();
 
+        // Check if target exists
+        if (!allowedDelegateCallTargets[safe][target]) {
+            return; // Target doesn't exist, nothing to remove
+        }
+
         allowedDelegateCallTargets[safe][target] = false;
+
+        // Remove from the targets list
+        uint256 indexToRemove = delegateCallTargetIndex[safe][target];
+        uint256 lastIndex = delegateCallTargetsList[safe].length - 1;
+
+        if (indexToRemove != lastIndex) {
+            // Move the last element to the position of the element to remove
+            address lastTarget = delegateCallTargetsList[safe][lastIndex];
+            delegateCallTargetsList[safe][indexToRemove] = lastTarget;
+            delegateCallTargetIndex[safe][lastTarget] = indexToRemove;
+        }
+
+        // Remove the last element
+        delegateCallTargetsList[safe].pop();
+        delete delegateCallTargetIndex[safe][target];
+
         emit DelegateCallTargetRemoved(safe, target);
     }
 
@@ -653,6 +688,24 @@ contract SafeTxPool is BaseGuard {
      */
     function isDelegateCallTargetAllowed(address safe, address target) external view returns (bool) {
         return allowedDelegateCallTargets[safe][target];
+    }
+
+    /**
+     * @notice Get all allowed delegate call targets for a Safe
+     * @param safe The Safe wallet address
+     * @return targets Array of allowed target addresses
+     */
+    function getDelegateCallTargets(address safe) external view returns (address[] memory) {
+        return delegateCallTargetsList[safe];
+    }
+
+    /**
+     * @notice Get the number of allowed delegate call targets for a Safe
+     * @param safe The Safe wallet address
+     * @return count Number of allowed targets
+     */
+    function getDelegateCallTargetsCount(address safe) external view returns (uint256) {
+        return delegateCallTargetsList[safe].length;
     }
 
     /**
