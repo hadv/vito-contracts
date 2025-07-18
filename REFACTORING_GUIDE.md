@@ -168,6 +168,36 @@ All existing tests should pass without modification when using `SafeTxPoolRegist
 └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
+## Development Workflow
+
+### Pre-commit Checks
+Always run the pre-commit script before committing:
+
+```bash
+./scripts/pre-commit-check.sh
+```
+
+This script will:
+- ✅ Check code formatting (`forge fmt --check`)
+- ✅ Build all contracts (`forge build`)
+- ✅ Run all tests (`forge test`)
+- ✅ Display contract sizes
+
+### Manual Checks
+```bash
+# Format code
+forge fmt
+
+# Check formatting
+forge fmt --check
+
+# Build with size info
+forge build --sizes
+
+# Run tests
+forge test
+```
+
 ## Conclusion
 
 This refactoring successfully addresses the contract size limitation while improving code organization and maintainability. The modular architecture provides a solid foundation for future enhancements without risking size limits.
