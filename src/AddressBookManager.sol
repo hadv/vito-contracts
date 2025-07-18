@@ -11,8 +11,17 @@ contract AddressBookManager is IAddressBookManager {
     // Mapping from Safe address to its array of address book entries
     mapping(address => AddressBookEntry[]) private addressBooks;
 
-    // No access control - the registry will handle validation
-    // This allows the registry to call these functions after validating the caller
+    // Registry contract that can call this manager
+    address public immutable registry;
+
+    constructor(address _registry) {
+        registry = _registry;
+    }
+
+    modifier onlySafeOrRegistry(address safe) {
+        if (msg.sender != safe && msg.sender != registry) revert NotSafeWallet();
+        _;
+    }
 
     /**
      * @notice Add an entry to the address book of a Safe
@@ -20,7 +29,7 @@ contract AddressBookManager is IAddressBookManager {
      * @param walletAddress The wallet address to add (mandatory)
      * @param name Name associated with the address (32 bytes)
      */
-    function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external {
+    function addAddressBookEntry(address safe, address walletAddress, bytes32 name) external onlySafeOrRegistry(safe) {
         // Validate inputs
         if (walletAddress == address(0)) revert InvalidAddress();
 
@@ -43,7 +52,7 @@ contract AddressBookManager is IAddressBookManager {
      * @param safe The Safe wallet address that owns this address book
      * @param walletAddress The wallet address to remove
      */
-    function removeAddressBookEntry(address safe, address walletAddress) external {
+    function removeAddressBookEntry(address safe, address walletAddress) external onlySafeOrRegistry(safe) {
         int256 index = findAddressBookEntry(safe, walletAddress);
 
         if (index < 0) revert AddressNotFound();

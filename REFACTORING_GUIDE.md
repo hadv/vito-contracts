@@ -17,33 +17,45 @@ The contract has been refactored into 6 smaller contracts:
 ### 1. **SafeTxPoolCore** (10,595 bytes)
 - **Responsibility**: Core transaction pool functionality
 - **Features**: Transaction proposal, signing, execution tracking, pending transaction management
+- **Access Control**: No restrictions (read-only operations)
 
-### 2. **AddressBookManager** (3,112 bytes)
+### 2. **AddressBookManager** (3,409 bytes)
 - **Responsibility**: Address book management
 - **Features**: Add/remove address book entries, address validation and lookup
+- **Access Control**: Only Safe wallet or Registry can modify entries
 
-### 3. **DelegateCallManager** (4,526 bytes)
+### 3. **DelegateCallManager** (4,913 bytes)
 - **Responsibility**: Delegate call permissions
 - **Features**: Enable/disable delegate calls, manage allowed targets, target restrictions
+- **Access Control**: Only Safe wallet or Registry can modify settings
 
-### 4. **TrustedContractManager** (1,353 bytes)
+### 4. **TrustedContractManager** (1,650 bytes)
 - **Responsibility**: Trusted contract management
 - **Features**: Add/remove trusted contracts, trust validation
+- **Access Control**: Only Safe wallet or Registry can modify trusted contracts
 
 ### 5. **TransactionValidator** (5,580 bytes)
 - **Responsibility**: Transaction validation logic
 - **Features**: Transaction type classification, type-specific validation rules
+- **Access Control**: Public validation functions (stateless)
 
-### 6. **SafeTxPoolRegistry** (12,519 bytes)
+### 6. **SafeTxPoolRegistry** (13,240 bytes)
 - **Responsibility**: Main coordinator and Guard interface
-- **Features**: Unified interface to all components, Guard implementation
+- **Features**: Unified interface to all components, Guard implementation, access control validation
+- **Access Control**: Validates Safe wallet ownership before delegating to managers
 
 ## Benefits
 
 ### Size Reduction
-- **Largest component**: 12,519 bytes (44% smaller than original)
+- **Largest component**: 13,240 bytes (41% smaller than original)
 - **All components**: Well within size limits with comfortable margins
 - **Future-proof**: Room for additional features in each component
+
+### Security Improvements
+- **Access Control**: Manager contracts only accept calls from Safe wallets or the Registry
+- **No Direct Access**: Prevents unauthorized direct calls to manager contracts
+- **Registry Validation**: Registry validates Safe ownership before delegating calls
+- **Principle of Least Privilege**: Each component has minimal required permissions
 
 ### Modularity
 - **Single Responsibility**: Each contract has one clear purpose

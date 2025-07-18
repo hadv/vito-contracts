@@ -20,31 +20,39 @@ contract DeployRefactoredSafeTxPool is Script {
 
         console.log("Deploying refactored SafeTxPool components...");
 
-        // Deploy core components
-        console.log("1. Deploying SafeTxPoolCore...");
+        // First deploy a placeholder registry to get its address
+        console.log("1. Deploying placeholder SafeTxPoolRegistry...");
+        SafeTxPoolRegistry tempRegistry = new SafeTxPoolRegistry(
+            address(0), address(0), address(0), address(0), address(0)
+        );
+        address registryAddress = address(tempRegistry);
+        console.log("   Placeholder registry address:", registryAddress);
+
+        // Deploy core components with the registry address
+        console.log("2. Deploying SafeTxPoolCore...");
         SafeTxPoolCore txPoolCore = new SafeTxPoolCore();
         console.log("   SafeTxPoolCore deployed at:", address(txPoolCore));
 
-        console.log("2. Deploying AddressBookManager...");
-        AddressBookManager addressBookManager = new AddressBookManager();
+        console.log("3. Deploying AddressBookManager...");
+        AddressBookManager addressBookManager = new AddressBookManager(registryAddress);
         console.log("   AddressBookManager deployed at:", address(addressBookManager));
 
-        console.log("3. Deploying DelegateCallManager...");
-        DelegateCallManager delegateCallManager = new DelegateCallManager();
+        console.log("4. Deploying DelegateCallManager...");
+        DelegateCallManager delegateCallManager = new DelegateCallManager(registryAddress);
         console.log("   DelegateCallManager deployed at:", address(delegateCallManager));
 
-        console.log("4. Deploying TrustedContractManager...");
-        TrustedContractManager trustedContractManager = new TrustedContractManager();
+        console.log("5. Deploying TrustedContractManager...");
+        TrustedContractManager trustedContractManager = new TrustedContractManager(registryAddress);
         console.log("   TrustedContractManager deployed at:", address(trustedContractManager));
 
-        console.log("5. Deploying TransactionValidator...");
+        console.log("6. Deploying TransactionValidator...");
         TransactionValidator transactionValidator = new TransactionValidator(
             address(addressBookManager),
             address(trustedContractManager)
         );
         console.log("   TransactionValidator deployed at:", address(transactionValidator));
 
-        console.log("6. Deploying SafeTxPoolRegistry...");
+        console.log("7. Deploying final SafeTxPoolRegistry...");
         SafeTxPoolRegistry registry = new SafeTxPoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
@@ -52,7 +60,7 @@ contract DeployRefactoredSafeTxPool is Script {
             address(trustedContractManager),
             address(transactionValidator)
         );
-        console.log("   SafeTxPoolRegistry deployed at:", address(registry));
+        console.log("   Final SafeTxPoolRegistry deployed at:", address(registry));
 
         vm.stopBroadcast();
 

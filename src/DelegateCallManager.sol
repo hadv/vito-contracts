@@ -17,15 +17,24 @@ contract DelegateCallManager is IDelegateCallManager {
     mapping(address => address[]) private delegateCallTargetsList;
     mapping(address => mapping(address => uint256)) private delegateCallTargetIndex;
 
-    // No access control - the registry will handle validation
-    // This allows the registry to call these functions after validating the caller
+    // Registry contract that can call this manager
+    address public immutable registry;
+
+    constructor(address _registry) {
+        registry = _registry;
+    }
+
+    modifier onlySafeOrRegistry(address safe) {
+        if (msg.sender != safe && msg.sender != registry) revert NotSafeWallet();
+        _;
+    }
 
     /**
      * @notice Enable or disable delegate calls for a Safe
      * @param safe The Safe wallet address
      * @param enabled Whether delegate calls should be enabled
      */
-    function setDelegateCallEnabled(address safe, bool enabled) external {
+    function setDelegateCallEnabled(address safe, bool enabled) external onlySafeOrRegistry(safe) {
         delegateCallEnabled[safe] = enabled;
         emit DelegateCallToggled(safe, enabled);
     }
@@ -35,7 +44,7 @@ contract DelegateCallManager is IDelegateCallManager {
      * @param safe The Safe wallet address
      * @param target The target address to allow for delegate calls
      */
-    function addDelegateCallTarget(address safe, address target) external {
+    function addDelegateCallTarget(address safe, address target) external onlySafeOrRegistry(safe) {
         // Validate target address
         if (target == address(0)) revert InvalidAddress();
 
@@ -59,7 +68,7 @@ contract DelegateCallManager is IDelegateCallManager {
      * @param safe The Safe wallet address
      * @param target The target address to remove from allowed delegate calls
      */
-    function removeDelegateCallTarget(address safe, address target) external {
+    function removeDelegateCallTarget(address safe, address target) external onlySafeOrRegistry(safe) {
         // Check if target exists
         if (!allowedDelegateCallTargets[safe][target]) {
             return; // Target doesn't exist, nothing to remove

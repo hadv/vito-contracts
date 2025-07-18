@@ -39,20 +39,26 @@ contract SafeTxPoolFactory {
         address trustedContractManager,
         address transactionValidator
     ) {
-        // First, deploy the registry with placeholder address to get its address
-        registry = address(new SafeTxPoolRegistry(
-            address(0), // placeholder
-            address(0), // placeholder
-            address(0), // placeholder
-            address(0), // placeholder
-            address(0)  // placeholder
-        ));
+        // Use CREATE2 to predict the registry address
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, block.timestamp));
 
-        // Deploy core components
+        // Calculate the registry address that will be deployed
+        bytes memory registryBytecode = abi.encodePacked(
+            type(SafeTxPoolRegistry).creationCode,
+            abi.encode(address(0), address(0), address(0), address(0), address(0))
+        );
+        registry = address(uint160(uint256(keccak256(abi.encodePacked(
+            bytes1(0xff),
+            address(this),
+            salt,
+            keccak256(registryBytecode)
+        )))));
+
+        // Deploy core components with predicted registry address
         txPoolCore = address(new SafeTxPoolCore());
-        addressBookManager = address(new AddressBookManager());
-        delegateCallManager = address(new DelegateCallManager());
-        trustedContractManager = address(new TrustedContractManager());
+        addressBookManager = address(new AddressBookManager(registry));
+        delegateCallManager = address(new DelegateCallManager(registry));
+        trustedContractManager = address(new TrustedContractManager(registry));
 
         // Deploy transaction validator with dependencies
         transactionValidator = address(new TransactionValidator(
@@ -60,8 +66,25 @@ contract SafeTxPoolFactory {
             trustedContractManager
         ));
 
-        // This approach won't work due to immutable variables
-        // We need a different approach
-        revert("Use DeployRefactoredSafeTxPool script instead");
+        // Deploy the actual registry with CREATE2
+        SafeTxPoolRegistry actualRegistry = new SafeTxPoolRegistry{salt: salt}(
+            txPoolCore,
+            addressBookManager,
+            delegateCallManager,
+            trustedContractManager,
+            transactionValidator
+        );
+
+        // Verify the address matches our prediction
+        require(address(actualRegistry) == registry, "Registry address mismatch");
+
+        emit SafeTxPoolDeployed(
+            registry,
+            txPoolCore,
+            addressBookManager,
+            delegateCallManager,
+            trustedContractManager,
+            transactionValidator
+        );
     }
 }
