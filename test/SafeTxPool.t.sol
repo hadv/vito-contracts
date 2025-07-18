@@ -27,10 +27,10 @@ contract SafeTxPoolTest is Test {
         // Deploy all components with new pattern
         txPoolCore = new SafeTxPoolCore();
 
-        // Deploy managers with zero address initially
-        addressBookManager = new AddressBookManager(address(0));
-        delegateCallManager = new DelegateCallManager(address(0));
-        trustedContractManager = new TrustedContractManager(address(0));
+        // Deploy managers
+        addressBookManager = new AddressBookManager();
+        delegateCallManager = new DelegateCallManager();
+        trustedContractManager = new TrustedContractManager();
 
         transactionValidator = new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
@@ -43,11 +43,11 @@ contract SafeTxPoolTest is Test {
             address(transactionValidator)
         );
 
-        // Update all components to use the correct registry address
+        // Set registry addresses for all components (one-time only)
         txPoolCore.setRegistry(address(registry));
-        addressBookManager.updateRegistry(address(registry));
-        delegateCallManager.updateRegistry(address(registry));
-        trustedContractManager.updateRegistry(address(registry));
+        addressBookManager.setRegistry(address(registry));
+        delegateCallManager.setRegistry(address(registry));
+        trustedContractManager.setRegistry(address(registry));
     }
 
     function testContractSizes() public {
@@ -143,5 +143,36 @@ contract SafeTxPoolTest is Test {
 
         // This demonstrates that the base contract pattern is working correctly
         // All managers share the same access control logic and registry reference
+    }
+
+    function testRegistryImmutability() public {
+        // Test that registry cannot be set twice (immutability)
+
+        // Deploy a new manager to test with
+        AddressBookManager newManager = new AddressBookManager();
+
+        // First setRegistry should work
+        newManager.setRegistry(address(registry));
+        assertEq(newManager.registry(), address(registry));
+
+        // Second setRegistry should fail
+        vm.expectRevert("Registry already set");
+        newManager.setRegistry(address(0x1234));
+
+        // Registry should still be the original value
+        assertEq(newManager.registry(), address(registry));
+    }
+
+    function testRegistryCannotBeZero() public {
+        // Test that registry cannot be set to zero address
+
+        AddressBookManager newManager = new AddressBookManager();
+
+        // Setting registry to zero should fail
+        vm.expectRevert("Invalid registry address");
+        newManager.setRegistry(address(0));
+
+        // Registry should still be zero (not set)
+        assertEq(newManager.registry(), address(0));
     }
 }

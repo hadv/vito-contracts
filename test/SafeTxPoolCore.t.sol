@@ -25,9 +25,9 @@ contract SafeTxPoolCoreTest is Test {
         // Deploy components with zero address initially, then update
 
         txPoolCore = new SafeTxPoolCore();
-        AddressBookManager addressBookManager = new AddressBookManager(address(0));
-        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
-        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
+        AddressBookManager addressBookManager = new AddressBookManager();
+        DelegateCallManager delegateCallManager = new DelegateCallManager();
+        TrustedContractManager trustedContractManager = new TrustedContractManager();
 
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
@@ -40,11 +40,11 @@ contract SafeTxPoolCoreTest is Test {
             address(transactionValidator)
         );
 
-        // Update all components to use the correct registry address
+        // Set registry addresses for all components (one-time only)
         txPoolCore.setRegistry(address(registry));
-        addressBookManager.updateRegistry(address(registry));
-        delegateCallManager.updateRegistry(address(registry));
-        trustedContractManager.updateRegistry(address(registry));
+        addressBookManager.setRegistry(address(registry));
+        delegateCallManager.setRegistry(address(registry));
+        trustedContractManager.setRegistry(address(registry));
 
         // Add recipient to address book for testing
         vm.prank(safe);

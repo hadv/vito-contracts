@@ -18,7 +18,7 @@ contract DelegateCallManager is BaseManager, IDelegateCallManager {
     mapping(address => address[]) private delegateCallTargetsList;
     mapping(address => mapping(address => uint256)) private delegateCallTargetIndex;
 
-    constructor(address _registry) BaseManager(_registry) {}
+
 
     /**
      * @notice Enable or disable delegate calls for a Safe

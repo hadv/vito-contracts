@@ -12,7 +12,7 @@ contract TrustedContractManager is BaseManager, ITrustedContractManager {
     // Contract whitelist for trusted contracts (like token contracts)
     mapping(address => mapping(address => bool)) private trustedContracts;
 
-    constructor(address _registry) BaseManager(_registry) {}
+
 
     /**
      * @notice Add a trusted contract for a Safe

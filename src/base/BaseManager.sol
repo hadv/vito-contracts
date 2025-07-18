@@ -13,21 +13,13 @@ abstract contract BaseManager is IBaseManager {
     address public registry;
 
     /**
-     * @notice Constructor to set the registry address
-     * @param _registry The registry contract address that can call this manager
+     * @notice Set the registry address (only callable once)
+     * @param _registry The registry contract address
      */
-    constructor(address _registry) {
-        registry = _registry; // Allow zero address for deployment flexibility
-    }
-
-    /**
-     * @notice Update the registry address (only callable by current registry or if registry is zero)
-     * @param _newRegistry The new registry contract address
-     */
-    function updateRegistry(address _newRegistry) external {
-        if (registry != address(0) && msg.sender != registry) revert NotSafeWallet();
-        if (_newRegistry == address(0)) revert InvalidAddress();
-        registry = _newRegistry;
+    function setRegistry(address _registry) external {
+        require(registry == address(0), "Registry already set");
+        require(_registry != address(0), "Invalid registry address");
+        registry = _registry;
     }
 
     /**
