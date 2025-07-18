@@ -18,8 +18,6 @@ contract DelegateCallManager is BaseManager, IDelegateCallManager {
     mapping(address => address[]) private delegateCallTargetsList;
     mapping(address => mapping(address => uint256)) private delegateCallTargetIndex;
 
-
-
     /**
      * @notice Enable or disable delegate calls for a Safe
      * @param safe The Safe wallet address
