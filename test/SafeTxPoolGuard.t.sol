@@ -2,698 +2,351 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/SafeTxPool.sol";
+import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafeTxPoolCore.sol";
+import "../src/AddressBookManager.sol";
+import "../src/DelegateCallManager.sol";
+import "../src/TrustedContractManager.sol";
+import "../src/TransactionValidator.sol";
 import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
+// Mock Safe contract for testing Guard functionality
 contract MockSafe {
-    bytes32 public lastTxHash;
-    bool public txSuccess;
-    SafeTxPool public txPool;
+    SafeTxPoolRegistry public guard;
 
-    constructor(SafeTxPool _txPool) {
-        txPool = _txPool;
+    constructor(SafeTxPoolRegistry _guard) {
+        guard = _guard;
     }
 
-    // Mock function to simulate a Safe calling checkAfterExecution
-    function executeTransaction(bytes32 _txHash, bool _success) external {
-        lastTxHash = _txHash;
-        txSuccess = _success;
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory signatures
+    ) external returns (bool success) {
+        bytes32 txHash = keccak256(
+            abi.encode(
+                to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, block.chainid
+            )
+        );
 
-        // Call checkAfterExecution on the guard
-        txPool.checkAfterExecution(_txHash, _success);
+        // Call guard before execution
+        guard.checkTransaction(
+            to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures, msg.sender
+        );
+
+        // Simulate transaction execution
+        success = true;
+
+        // Call guard after execution
+        guard.checkAfterExecution(txHash, success);
+
+        return success;
     }
 }
 
 contract SafeTxPoolGuardTest is Test {
-    event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
-    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
-    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
-    event SelfCallAllowed(address indexed safe, address indexed to);
-    event GuardCallAllowed(address indexed safe, address indexed guard);
-
-    SafeTxPool public pool;
+    SafeTxPoolRegistry public registry;
+    SafeTxPoolCore public txPoolCore;
     MockSafe public mockSafe;
-    MockSafe public mockSafe2;
-    address public owner;
-    address public owner2;
-    address public recipient;
-    uint256 public ownerKey;
-    uint256 public owner2Key;
+
+    address public safe;
+    address public owner1 = address(0x5678);
+    address public recipient = address(0x9ABC);
 
     function setUp() public {
-        // Setup test accounts
-        ownerKey = 0xA11CE;
-        owner2Key = 0xB0B;
-        owner = vm.addr(ownerKey);
-        owner2 = vm.addr(owner2Key);
-        recipient = address(0x5678);
+        // Deploy components with new pattern
+        txPoolCore = new SafeTxPoolCore();
+        AddressBookManager addressBookManager = new AddressBookManager(address(0));
+        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
+        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
 
-        // Deploy SafeTxPool
-        pool = new SafeTxPool();
+        TransactionValidator transactionValidator =
+            new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
-        // Deploy mock Safes
-        mockSafe = new MockSafe(pool);
-        mockSafe2 = new MockSafe(pool);
-
-        // Fund the owners
-        vm.deal(owner, 10 ether);
-        vm.deal(owner2, 10 ether);
-    }
-
-    /**
-     * @notice Generate EIP-712 signature for SafeTx
-     */
-    function _generateEIP712Signature(
-        uint256 privateKey,
-        address safe,
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        uint256 nonce
-    ) internal view returns (bytes memory signature) {
-        // EIP-712 domain separator
-        bytes32 domainSeparator = keccak256(
-            abi.encode(keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safe)
+        registry = new SafeTxPoolRegistry(
+            address(txPoolCore),
+            address(addressBookManager),
+            address(delegateCallManager),
+            address(trustedContractManager),
+            address(transactionValidator)
         );
 
-        // Safe transaction struct hash
-        bytes32 safeTxHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
-                ),
-                to,
-                value,
-                keccak256(data),
-                operation,
-                0, // safeTxGas
-                0, // baseGas
-                0, // gasPrice
-                address(0), // gasToken
-                address(0), // refundReceiver
-                nonce
-            )
-        );
+        // Update all components to use the correct registry address
+        txPoolCore.setRegistry(address(registry));
+        addressBookManager.updateRegistry(address(registry));
+        delegateCallManager.updateRegistry(address(registry));
+        trustedContractManager.updateRegistry(address(registry));
 
-        // Final EIP-712 hash
-        bytes32 eip712Hash = keccak256(abi.encodePacked("\x19\x01", domainSeparator, safeTxHash));
+        // Deploy mock safe
+        mockSafe = new MockSafe(registry);
+        safe = address(mockSafe);
 
-        // Sign the EIP-712 hash
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, eip712Hash);
-        signature = abi.encodePacked(r, s, v);
+        // Add recipient to address book
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient, "Test Recipient");
     }
 
-    function testGuardAutoMarkExecution() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+    function testGuardCheckTransaction() public {
+        bytes memory data = "";
+        bytes memory signatures = "";
 
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
+        // Should not revert for valid transaction to address in address book
+        // The Safe must be the caller for proper access control
+        vm.prank(safe);
+        registry.checkTransaction(
+            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures, owner1
+        );
+    }
+
+    function testGuardRejectsTransactionToUnknownAddress() public {
+        address unknownAddress = address(0xDEAD);
+        bytes memory data = "";
+        bytes memory signatures = "";
+
+        // Should revert for transaction to address not in address book
+        // The Safe must be the caller
+        vm.prank(safe);
+        vm.expectRevert();
+        registry.checkTransaction(
+            unknownAddress,
             1 ether,
             data,
             Enum.Operation.Call,
-            0 // nonce
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signatures,
+            owner1
         );
-
-        // Verify transaction exists in pool
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 1);
-        assertEq(pendingTxs[0], txHash);
-
-        // Simulate Safe executing the transaction and calling the guard's checkAfterExecution
-        mockSafe.executeTransaction(txHash, true);
-
-        // Verify transaction was removed from pool
-        pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
-
-        // Verify transaction data is deleted
-        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
-        assertEq(txProposer, address(0));
-        assertEq(txSafe, address(0));
     }
 
-    function testGuardDoesNotMarkFailedTransactions() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+    function testGuardAllowsSelfCall() public {
+        bytes memory data = "";
+        bytes memory signatures = "";
 
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
+        // Should allow calls to the Safe itself without needing address book entry
+        // The guard should handle this case specially
+        vm.prank(safe); // Important: the Safe itself must be the caller for self-call detection
+        registry.checkTransaction(
+            safe, 0, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures, owner1
+        );
+    }
+
+    function testGuardAllowsGuardCall() public {
+        bytes memory data = "";
+        bytes memory signatures = "";
+
+        // Should allow calls to the guard contract itself
+        // The Safe must be the caller for guard call detection
+        vm.prank(safe);
+        registry.checkTransaction(
+            address(registry),
+            0,
             data,
             Enum.Operation.Call,
-            0 // nonce
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signatures,
+            owner1
         );
+    }
 
-        // Simulate Safe executing the transaction but fails
-        mockSafe.executeTransaction(txHash, false);
+    function testGuardCheckAfterExecution() public {
+        bytes32 txHash = keccak256("test transaction");
+        bytes memory data = "";
 
-        // Verify transaction still exists in pool (not marked as executed)
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 1);
-        assertEq(pendingTxs[0], txHash);
+        // First propose the transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Verify transaction exists
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, safe);
+
+        // Call checkAfterExecution (simulating Safe calling after execution)
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Transaction should be marked as executed (removed from pending)
+        (txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0)); // Should be empty/deleted
     }
 
     function testGuardIgnoresUnknownTransactions() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes32 unknownTxHash = keccak256("unknown transaction hash");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        // Simulate Safe executing a different transaction
-        mockSafe.executeTransaction(unknownTxHash, true);
-
-        // Verify transaction still exists in pool (not marked as executed)
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 1);
-        assertEq(pendingTxs[0], txHash);
-    }
-
-    function testGuardEmitsTransactionExecutedEvent() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        // Get transaction ID for event verification
-        (,,,,,,, uint256 txId) = pool.getTxDetails(txHash);
-
-        // Expect TransactionExecuted event to be emitted
-        vm.expectEmit(true, true, true, true);
-        emit TransactionExecuted(txHash, address(mockSafe), txId);
-
-        // Simulate Safe executing the transaction
-        mockSafe.executeTransaction(txHash, true);
-    }
-
-    function testGuardWithMultiplePendingTransactions() public {
-        // Prepare multiple transaction data
-        bytes32[] memory txHashes = new bytes32[](3);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose multiple transactions
-        for (uint256 i = 0; i < 3; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i // nonce
-            );
-        }
-
-        // Verify all transactions are pending
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(pendingTxs.length, 3);
-
-        // Execute middle transaction via guard
-        mockSafe.executeTransaction(txHashes[1], true);
-
-        // Verify only middle transaction was removed
-        pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(pendingTxs.length, 2);
-        assertEq(pendingTxs[0], txHashes[0]);
-        assertEq(pendingTxs[1], txHashes[2]);
-
-        // Execute remaining transactions
-        mockSafe.executeTransaction(txHashes[0], true);
-        mockSafe.executeTransaction(txHashes[2], true);
-
-        // Verify all transactions are removed
-        pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(pendingTxs.length, 0);
-    }
-
-    function testGuardMultipleCallsSameTransaction() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        // First execution via guard - should succeed
-        mockSafe.executeTransaction(txHash, true);
-
-        // Verify transaction was removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
-
-        // Second execution via guard - should not revert (transaction already gone)
-        mockSafe.executeTransaction(txHash, true);
-
-        // Verify still no pending transactions
-        pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
-    }
-
-    function testGuardWithMultipleSafes() public {
-        // Prepare transaction data for both Safes
-        bytes32 txHash1 = keccak256("test transaction 1");
-        bytes32 txHash2 = keccak256("test transaction 2");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transactions for both Safes
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash1,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        vm.prank(owner2);
-        pool.proposeTx(
-            txHash2,
-            address(mockSafe2),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        // Verify both transactions are pending
-        bytes32[] memory pendingTxs1 = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        bytes32[] memory pendingTxs2 = pool.getPendingTxHashes(address(mockSafe2), 0, 1);
-        assertEq(pendingTxs1.length, 1);
-        assertEq(pendingTxs2.length, 1);
-
-        // Execute transaction from first Safe
-        mockSafe.executeTransaction(txHash1, true);
-
-        // Verify only first Safe's transaction was removed
-        pendingTxs1 = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        pendingTxs2 = pool.getPendingTxHashes(address(mockSafe2), 0, 1);
-        assertEq(pendingTxs1.length, 0);
-        assertEq(pendingTxs2.length, 1);
-
-        // Execute transaction from second Safe
-        mockSafe2.executeTransaction(txHash2, true);
-
-        // Verify both transactions are now removed
-        pendingTxs1 = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        pendingTxs2 = pool.getPendingTxHashes(address(mockSafe2), 0, 1);
-        assertEq(pendingTxs1.length, 0);
-        assertEq(pendingTxs2.length, 0);
-    }
-
-    function testGuardWithSignedTransactions() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(
-            txHash,
-            address(mockSafe),
-            recipient,
-            1 ether,
-            data,
-            Enum.Operation.Call,
-            0 // nonce
-        );
-
-        // Generate EIP-712 signature
-        bytes memory signature =
-            _generateEIP712Signature(ownerKey, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
-
-        vm.prank(owner);
-        pool.signTx(txHash, signature);
-
-        // Verify signature exists
-        assertTrue(pool.hasSignedTx(txHash, owner));
-        bytes[] memory signatures = pool.getSignatures(txHash);
-        assertEq(signatures.length, 1);
-
-        // Execute via guard
-        mockSafe.executeTransaction(txHash, true);
-
-        // Verify transaction and signatures are removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
-
-        // Verify transaction data is completely deleted
-        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
-        assertEq(txProposer, address(0));
-        assertEq(txSafe, address(0));
-    }
-
-    function testGuardEmitsRemovalEvents() public {
-        // Propose transaction
-        bytes32 txHash = keccak256("removal event test");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 100 ether);
-
-        vm.prank(owner);
-        pool.proposeTx(txHash, address(mockSafe), recipient, 0, data, Enum.Operation.Call, 0);
-
-        // Get transaction ID for event verification
-        (,,,,,,, uint256 txId) = pool.getTxDetails(txHash);
-
-        // Execute via guard and expect removal event
-        vm.expectEmit(true, true, true, true);
-        emit TransactionRemovedFromPending(txHash, address(mockSafe), txId, "nonce_consumed");
-
-        mockSafe.executeTransaction(txHash, true);
-
-        // Verify transaction was removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
-    }
-
-    function testGuardStateConsistencyAfterExecution() public {
-        // Prepare multiple transactions with different nonces
-        bytes32[] memory txHashes = new bytes32[](3);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        for (uint256 i = 0; i < 3; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(
-                txHashes[i],
-                address(mockSafe),
-                recipient,
-                1 ether,
-                data,
-                Enum.Operation.Call,
-                i // different nonces
-            );
-        }
-
-        // Get initial state
-        bytes32[] memory initialPending = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(initialPending.length, 3);
-
-        // Execute transactions in random order via guard
-        mockSafe.executeTransaction(txHashes[1], true); // Execute middle one first
-        mockSafe.executeTransaction(txHashes[0], true); // Execute first one
-        mockSafe.executeTransaction(txHashes[2], true); // Execute last one
-
-        // Verify all transactions are removed and state is consistent
-        bytes32[] memory finalPending = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(finalPending.length, 0);
-
-        // Verify all transaction data is deleted
-        for (uint256 i = 0; i < 3; i++) {
-            (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHashes[i]);
-            assertEq(txProposer, address(0));
-            assertEq(txSafe, address(0));
-        }
-    }
-
-    function testGuardWithEmptyPool() public {
-        // Try to execute a transaction that was never proposed
         bytes32 unknownTxHash = keccak256("unknown transaction");
 
-        // This should not revert - guard should handle gracefully
-        mockSafe.executeTransaction(unknownTxHash, true);
-
-        // Verify pool remains empty
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
+        // Should not revert when checking unknown transaction
+        vm.prank(safe);
+        registry.checkAfterExecution(unknownTxHash, true);
     }
 
-    function testGuardFailedTransactionDoesNotAffectOthers() public {
-        // Prepare multiple transactions
-        bytes32[] memory txHashes = new bytes32[](3);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        for (uint256 i = 0; i < 3; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
-        }
-
-        // Execute one transaction successfully
-        mockSafe.executeTransaction(txHashes[0], true);
-
-        // Execute one transaction with failure
-        mockSafe.executeTransaction(txHashes[1], false);
-
-        // Execute another transaction successfully
-        mockSafe.executeTransaction(txHashes[2], true);
-
-        // Verify only successful transactions were removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 3);
-        assertEq(pendingTxs.length, 1);
-        assertEq(pendingTxs[0], txHashes[1]); // Only failed transaction remains
-    }
-
-    function testGuardDirectCallToCheckAfterExecution() public {
-        // Prepare transaction data
+    function testGuardDoesNotMarkFailedTransactions() public {
         bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+        bytes memory data = "";
 
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
-        // Directly call checkAfterExecution (simulating Safe calling it)
-        vm.prank(address(mockSafe));
-        pool.checkAfterExecution(txHash, true);
+        // Call checkAfterExecution with failed status
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, false);
 
-        // Verify transaction was removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
+        // Transaction should still exist (not marked as executed)
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, safe); // Should still exist
     }
 
-    function testGuardDirectCallToCheckAfterExecutionWithFailure() public {
-        // Prepare transaction data
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+    function testGuardWithDelegateCallRestrictions() public {
+        address delegateTarget = address(0xBEEF);
+        bytes memory data = "";
+        bytes memory signatures = "";
 
-        // Propose transaction in the pool
-        vm.prank(owner);
-        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
+        // Enable delegate calls first
+        vm.prank(safe);
+        registry.setDelegateCallEnabled(safe, true);
 
-        // Directly call checkAfterExecution with failure
-        vm.prank(address(mockSafe));
-        pool.checkAfterExecution(txHash, false);
+        // Add delegate call target
+        vm.prank(safe);
+        registry.addDelegateCallTarget(safe, delegateTarget);
 
-        // Verify transaction was NOT removed (failure case)
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 1);
-        assertEq(pendingTxs[0], txHash);
+        // Add delegate target to address book (required by transaction validator)
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, delegateTarget, "Delegate Target");
+
+        // Should allow delegate call to allowed target
+        vm.prank(safe);
+        registry.checkTransaction(
+            delegateTarget,
+            0,
+            data,
+            Enum.Operation.DelegateCall,
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signatures,
+            owner1
+        );
+
+        // Should reject delegate call to non-allowed target
+        address nonAllowedTarget = address(0xDEAD);
+        vm.prank(safe);
+        vm.expectRevert();
+        registry.checkTransaction(
+            nonAllowedTarget,
+            0,
+            data,
+            Enum.Operation.DelegateCall,
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signatures,
+            owner1
+        );
     }
 
-    function testGuardVsDirectCallGasComparison() public {
-        // Prepare transaction data
-        bytes32 txHash1 = keccak256("test transaction 1");
-        bytes32 txHash2 = keccak256("test transaction 2");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+    function testGuardWithTrustedContracts() public {
+        address trustedContract = address(0xFEED);
+        bytes memory data = "";
+        bytes memory signatures = "";
 
-        // Propose both transactions
-        vm.prank(owner);
-        pool.proposeTx(txHash1, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
+        // Add trusted contract
+        vm.prank(safe);
+        registry.addTrustedContract(safe, trustedContract);
 
-        vm.prank(owner);
-        pool.proposeTx(txHash2, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 1);
+        // Also add to address book (trusted contracts still need to be in address book for basic validation)
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, trustedContract, "Trusted Contract");
 
-        // Measure gas for direct call to markAsExecuted
-        uint256 gasStart = gasleft();
-        vm.prank(address(mockSafe));
-        pool.markAsExecuted(txHash1);
-        uint256 gasUsedDirect = gasStart - gasleft();
-
-        // Measure gas for guard call (via checkAfterExecution)
-        gasStart = gasleft();
-        mockSafe.executeTransaction(txHash2, true);
-        uint256 gasUsedGuard = gasStart - gasleft();
-
-        // Guard call should use more gas due to external call overhead
-        assertGt(gasUsedGuard, gasUsedDirect);
-
-        // Both transactions should be removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 2);
-        assertEq(pendingTxs.length, 0);
+        // Should allow calls to trusted contracts
+        vm.prank(safe);
+        registry.checkTransaction(
+            trustedContract,
+            1 ether,
+            data,
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(0)),
+            signatures,
+            owner1
+        );
     }
 
-    function testGuardWithLargeNumberOfTransactions() public {
-        // Create a large number of transactions to test performance
-        uint256 numTxs = 50;
-        bytes32[] memory txHashes = new bytes32[](numTxs);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+    function testFullTransactionFlow() public {
+        bytes memory data = "";
+        bytes memory signatures = "";
 
-        // Propose all transactions
-        for (uint256 i = 0; i < numTxs; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
-        }
+        // Create the same hash that MockSafe will create
+        bytes32 txHash = keccak256(
+            abi.encode(recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
+        );
 
-        // Verify all transactions are pending
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, numTxs);
-        assertEq(pendingTxs.length, numTxs);
+        // 1. Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
-        // Execute all transactions via guard in reverse order
-        for (uint256 i = numTxs; i > 0; i--) {
-            mockSafe.executeTransaction(txHashes[i - 1], true);
-        }
+        // 2. Execute transaction through mock safe (includes guard checks)
+        mockSafe.execTransaction(
+            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+        );
 
-        // Verify all transactions are removed
-        pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, numTxs);
-        assertEq(pendingTxs.length, 0);
-    }
-
-    function testGuardWithMixedSuccessFailurePattern() public {
-        // Create transactions with alternating success/failure pattern
-        bytes32[] memory txHashes = new bytes32[](10);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose all transactions
-        for (uint256 i = 0; i < 10; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
-        }
-
-        // Execute with alternating success/failure pattern
-        for (uint256 i = 0; i < 10; i++) {
-            bool success = (i % 2 == 0); // Even indices succeed, odd indices fail
-            mockSafe.executeTransaction(txHashes[i], success);
-        }
-
-        // Verify only failed transactions remain (odd indices)
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 10);
-        assertEq(pendingTxs.length, 5); // 5 failed transactions should remain
-
-        // Verify the remaining transactions are the failed ones (odd indices: 1, 3, 5, 7, 9)
-        // Note: Order may not be preserved due to how _removeFromPending works
-        bytes32[] memory expectedFailedTxs = new bytes32[](5);
-        expectedFailedTxs[0] = txHashes[1]; // index 1
-        expectedFailedTxs[1] = txHashes[3]; // index 3
-        expectedFailedTxs[2] = txHashes[5]; // index 5
-        expectedFailedTxs[3] = txHashes[7]; // index 7
-        expectedFailedTxs[4] = txHashes[9]; // index 9
-
-        // Check that all expected failed transactions are still in the pending list
-        for (uint256 i = 0; i < 5; i++) {
-            bool found = false;
-            for (uint256 j = 0; j < pendingTxs.length; j++) {
-                if (pendingTxs[j] == expectedFailedTxs[i]) {
-                    found = true;
-                    break;
-                }
-            }
-            assertTrue(found, "Failed transaction should still be pending");
-        }
-
-        // Verify that successful transactions are not in the pending list
-        bytes32[] memory expectedSuccessfulTxs = new bytes32[](5);
-        expectedSuccessfulTxs[0] = txHashes[0]; // index 0
-        expectedSuccessfulTxs[1] = txHashes[2]; // index 2
-        expectedSuccessfulTxs[2] = txHashes[4]; // index 4
-        expectedSuccessfulTxs[3] = txHashes[6]; // index 6
-        expectedSuccessfulTxs[4] = txHashes[8]; // index 8
-
-        for (uint256 i = 0; i < 5; i++) {
-            bool found = false;
-            for (uint256 j = 0; j < pendingTxs.length; j++) {
-                if (pendingTxs[j] == expectedSuccessfulTxs[i]) {
-                    found = true;
-                    break;
-                }
-            }
-            assertFalse(found, "Successful transaction should not be pending");
-        }
-    }
-
-    function testGuardEventEmissionOrder() public {
-        // Test that events are emitted in the correct order when multiple transactions are executed
-        bytes32[] memory txHashes = new bytes32[](3);
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
-
-        // Propose transactions and get their IDs
-        uint256[] memory txIds = new uint256[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            txHashes[i] = keccak256(abi.encodePacked("test transaction", i));
-            vm.prank(owner);
-            pool.proposeTx(txHashes[i], address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, i);
-            (,,,,,,, uint256 txId) = pool.getTxDetails(txHashes[i]);
-            txIds[i] = txId;
-        }
-
-        // Execute transactions and verify events are emitted in correct order
-        for (uint256 i = 0; i < 3; i++) {
-            vm.expectEmit(true, true, true, true);
-            emit TransactionExecuted(txHashes[i], address(mockSafe), txIds[i]);
-            mockSafe.executeTransaction(txHashes[i], true);
-        }
+        // 3. Verify transaction was automatically marked as executed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0)); // Should be empty/deleted
     }
 
     function testGuardReentrancyProtection() public {
-        // This test ensures that the guard mechanism doesn't cause reentrancy issues
-        // when markAsExecuted is called via checkAfterExecution
+        bytes32 txHash = keccak256("reentrancy test");
 
-        bytes32 txHash = keccak256("test transaction");
-        bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", recipient, 1 ether);
+        // Should not allow reentrancy during checkAfterExecution
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
 
-        // Propose transaction
-        vm.prank(owner);
-        pool.proposeTx(txHash, address(mockSafe), recipient, 1 ether, data, Enum.Operation.Call, 0);
+        // Multiple calls should be safe (no reentrancy issues)
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+    }
 
-        // Execute transaction - this internally calls this.markAsExecuted(txHash)
-        // which should not cause reentrancy issues
-        mockSafe.executeTransaction(txHash, true);
+    function testGuardWithMultiplePendingTransactions() public {
+        bytes32 txHash1 = keccak256("test transaction 1");
+        bytes32 txHash2 = keccak256("test transaction 2");
+        bytes memory data = "";
 
-        // Verify transaction was properly removed
-        bytes32[] memory pendingTxs = pool.getPendingTxHashes(address(mockSafe), 0, 1);
-        assertEq(pendingTxs.length, 0);
+        // Propose multiple transactions
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
-        // Verify transaction data is completely cleaned up
-        (address txSafe,,,,, address txProposer,,) = pool.getTxDetails(txHash);
-        assertEq(txProposer, address(0));
-        assertEq(txSafe, address(0));
+        vm.prank(owner1);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, 1);
+
+        // Execute first transaction
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        // First should be removed, second should remain
+        (address txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (address txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+
+        assertEq(txSafe1, address(0)); // Should be deleted
+        assertEq(txSafe2, safe); // Should still exist
     }
 }

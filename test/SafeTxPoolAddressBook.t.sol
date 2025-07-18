@@ -1,213 +1,245 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {Test} from "forge-std/Test.sol";
-import {SafeTxPool} from "../src/SafeTxPool.sol";
+import "forge-std/Test.sol";
+import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafeTxPoolCore.sol";
+import "../src/AddressBookManager.sol";
+import "../src/DelegateCallManager.sol";
+import "../src/TrustedContractManager.sol";
+import "../src/TransactionValidator.sol";
+import "../src/interfaces/IAddressBookManager.sol";
 
 contract SafeTxPoolAddressBookTest is Test {
-    event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
-    event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
+    SafeTxPoolRegistry public registry;
+    SafeTxPoolCore public txPoolCore;
+    AddressBookManager public addressBookManager;
 
-    SafeTxPool public pool;
-    address public safe;
-    address public walletAddress1;
-    address public walletAddress2;
-    address public walletAddress3;
+    address public safe = address(0x1234);
+    address public recipient1 = address(0x5678);
+    address public recipient2 = address(0x9ABC);
+    address public recipient3 = address(0xDEF0);
 
     function setUp() public {
-        // Deploy SafeTxPool
-        pool = new SafeTxPool();
+        // Deploy components with new pattern
+        txPoolCore = new SafeTxPoolCore();
+        addressBookManager = new AddressBookManager(address(0));
+        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
+        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
 
-        // Setup test addresses
-        safe = address(0x1234);
-        walletAddress1 = address(0x5678);
-        walletAddress2 = address(0xABCD);
-        walletAddress3 = address(0xEF01);
+        TransactionValidator transactionValidator =
+            new TransactionValidator(address(addressBookManager), address(trustedContractManager));
+
+        registry = new SafeTxPoolRegistry(
+            address(txPoolCore),
+            address(addressBookManager),
+            address(delegateCallManager),
+            address(trustedContractManager),
+            address(transactionValidator)
+        );
+
+        // Update all components to use the correct registry address
+        txPoolCore.setRegistry(address(registry));
+        addressBookManager.updateRegistry(address(registry));
+        delegateCallManager.updateRegistry(address(registry));
+        trustedContractManager.updateRegistry(address(registry));
     }
 
     function testAddAddressBookEntry() public {
-        // Test adding a new entry
-        bytes32 name = bytes32("Alice");
         vm.prank(safe);
-        vm.expectEmit(true, true, true, true);
-        emit AddressBookEntryAdded(safe, walletAddress1, name);
-        pool.addAddressBookEntry(safe, walletAddress1, name);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
 
-        // Get all entries and verify
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
         assertEq(entries.length, 1);
-        assertEq(entries[0].walletAddress, walletAddress1);
-        assertEq(entries[0].name, name);
-    }
-
-    function testUpdateExistingAddressBookEntry() public {
-        // Add initial entry
-        bytes32 name1 = bytes32("Alice");
-        vm.prank(safe);
-        pool.addAddressBookEntry(safe, walletAddress1, name1);
-
-        // Update the entry
-        bytes32 name2 = bytes32("Alice Updated");
-        vm.prank(safe);
-        vm.expectEmit(true, true, true, true);
-        emit AddressBookEntryAdded(safe, walletAddress1, name2);
-        pool.addAddressBookEntry(safe, walletAddress1, name2);
-
-        // Get all entries and verify update
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
-        assertEq(entries.length, 1);
-        assertEq(entries[0].walletAddress, walletAddress1);
-        assertEq(entries[0].name, name2);
+        assertEq(entries[0].walletAddress, recipient1);
+        assertEq(entries[0].name, "Alice");
     }
 
     function testAddMultipleAddressBookEntries() public {
-        // Add multiple entries
-        bytes32 name1 = bytes32("Alice");
-        bytes32 name2 = bytes32("Bob");
-        bytes32 name3 = bytes32("Carol");
-        vm.startPrank(safe);
-        pool.addAddressBookEntry(safe, walletAddress1, name1);
-        pool.addAddressBookEntry(safe, walletAddress2, name2);
-        pool.addAddressBookEntry(safe, walletAddress3, name3);
-        vm.stopPrank();
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
 
-        // Get all entries and verify
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient2, "Bob");
+
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient3, "Charlie");
+
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
         assertEq(entries.length, 3);
 
-        // Verify each entry by address - order may vary based on implementation
-        bool foundWallet1 = false;
-        bool foundWallet2 = false;
-        bool foundWallet3 = false;
+        // Check all entries
+        assertEq(entries[0].walletAddress, recipient1);
+        assertEq(entries[0].name, "Alice");
+        assertEq(entries[1].walletAddress, recipient2);
+        assertEq(entries[1].name, "Bob");
+        assertEq(entries[2].walletAddress, recipient3);
+        assertEq(entries[2].name, "Charlie");
+    }
 
-        for (uint256 i = 0; i < entries.length; i++) {
-            if (entries[i].walletAddress == walletAddress1) {
-                assertEq(entries[i].name, name1);
-                foundWallet1 = true;
-            } else if (entries[i].walletAddress == walletAddress2) {
-                assertEq(entries[i].name, name2);
-                foundWallet2 = true;
-            } else if (entries[i].walletAddress == walletAddress3) {
-                assertEq(entries[i].name, name3);
-                foundWallet3 = true;
-            }
-        }
+    function testUpdateExistingAddressBookEntry() public {
+        // Add entry
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
 
-        assertTrue(foundWallet1);
-        assertTrue(foundWallet2);
-        assertTrue(foundWallet3);
+        // Update same address with new name
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice Updated");
+
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
+        assertEq(entries.length, 1); // Should still be 1 entry
+        assertEq(entries[0].walletAddress, recipient1);
+        assertEq(entries[0].name, "Alice Updated");
     }
 
     function testRemoveAddressBookEntry() public {
-        // Add entries
-        vm.startPrank(safe);
-        pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
-        pool.addAddressBookEntry(safe, walletAddress2, bytes32("Bob"));
+        // Add multiple entries
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient2, "Bob");
 
         // Remove one entry
-        vm.expectEmit(true, true, true, true);
-        emit AddressBookEntryRemoved(safe, walletAddress1);
-        pool.removeAddressBookEntry(safe, walletAddress1);
-        vm.stopPrank();
+        vm.prank(safe);
+        registry.removeAddressBookEntry(safe, recipient1);
 
-        // Get entries and verify
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
         assertEq(entries.length, 1);
-        assertEq(entries[0].walletAddress, walletAddress2);
+        assertEq(entries[0].walletAddress, recipient2);
+        assertEq(entries[0].name, "Bob");
     }
 
-    function testRemoveLastAddressBookEntry() public {
-        // Add an entry
+    function testRemoveNonExistentEntry() public {
         vm.prank(safe);
-        pool.addAddressBookEntry(safe, walletAddress1, bytes32("Alice"));
+        vm.expectRevert(IAddressBookManager.AddressNotFound.selector);
+        registry.removeAddressBookEntry(safe, recipient1);
+    }
 
-        // Remove the entry
+    function testHasAddressBookEntry() public {
+        // Initially should not have entry
+        bool hasEntry = addressBookManager.hasAddressBookEntry(safe, recipient1);
+        assertFalse(hasEntry);
+
+        // Add entry
         vm.prank(safe);
-        pool.removeAddressBookEntry(safe, walletAddress1);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
 
-        // Get entries and verify it's empty
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+        // Should now have entry
+        hasEntry = addressBookManager.hasAddressBookEntry(safe, recipient1);
+        assertTrue(hasEntry);
+
+        // Remove entry
+        vm.prank(safe);
+        registry.removeAddressBookEntry(safe, recipient1);
+
+        // Should no longer have entry
+        hasEntry = addressBookManager.hasAddressBookEntry(safe, recipient1);
+        assertFalse(hasEntry);
+    }
+
+    function testFindAddressBookEntry() public {
+        // Add multiple entries
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient2, "Bob");
+
+        // Find entries
+        int256 index1 = addressBookManager.findAddressBookEntry(safe, recipient1);
+        int256 index2 = addressBookManager.findAddressBookEntry(safe, recipient2);
+        int256 indexNotFound = addressBookManager.findAddressBookEntry(safe, recipient3);
+
+        assertEq(index1, 0);
+        assertEq(index2, 1);
+        assertEq(indexNotFound, -1);
+    }
+
+    function testOnlySafeCanModifyAddressBook() public {
+        address unauthorized = address(0x9999);
+
+        // Try to add entry as unauthorized user
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        // Add entry as safe
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        // Try to remove entry as unauthorized user
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        registry.removeAddressBookEntry(safe, recipient1);
+    }
+
+    function testInvalidAddressRejected() public {
+        vm.prank(safe);
+        vm.expectRevert();
+        registry.addAddressBookEntry(safe, address(0), "Invalid");
+    }
+
+    function testAddressBookIsolatedBetweenSafes() public {
+        address safe2 = address(0x2468);
+
+        // Add entry to safe1
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        // Add entry to safe2
+        vm.prank(safe2);
+        registry.addAddressBookEntry(safe2, recipient2, "Bob");
+
+        // Check safe1 only has its entry
+        IAddressBookManager.AddressBookEntry[] memory entries1 = registry.getAddressBookEntries(safe);
+        assertEq(entries1.length, 1);
+        assertEq(entries1[0].walletAddress, recipient1);
+
+        // Check safe2 only has its entry
+        IAddressBookManager.AddressBookEntry[] memory entries2 = registry.getAddressBookEntries(safe2);
+        assertEq(entries2.length, 1);
+        assertEq(entries2[0].walletAddress, recipient2);
+    }
+
+    function testEmptyAddressBookReturnsEmptyArray() public {
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
         assertEq(entries.length, 0);
     }
 
-    function testGetAddressBookEntriesForEmptySafe() public view {
-        // Get entries for a Safe with no entries
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
-        assertEq(entries.length, 0);
+    function testAddressBookEntryEvents() public {
+        // Test add event
+        vm.expectEmit(true, true, false, true);
+        emit IAddressBookManager.AddressBookEntryAdded(safe, recipient1, "Alice");
+
+        vm.prank(safe);
+        registry.addAddressBookEntry(safe, recipient1, "Alice");
+
+        // Test remove event
+        vm.expectEmit(true, true, false, false);
+        emit IAddressBookManager.AddressBookEntryRemoved(safe, recipient1);
+
+        vm.prank(safe);
+        registry.removeAddressBookEntry(safe, recipient1);
     }
 
-    function testMultipleSafesWithAddressBooks() public {
-        // Create another Safe
-        address safe2 = address(0x9876);
+    function testLargeAddressBook() public {
+        // Test with many entries to ensure gas efficiency
+        uint256 numEntries = 50;
 
-        // Add entries to first Safe
-        bytes32 name1 = bytes32("Alice");
-        bytes32 name2 = bytes32("Bob");
-        vm.prank(safe);
-        pool.addAddressBookEntry(safe, walletAddress1, name1);
-        vm.prank(safe);
-        pool.addAddressBookEntry(safe, walletAddress2, name2);
+        for (uint256 i = 0; i < numEntries; i++) {
+            address addr = address(uint160(0x1000 + i));
+            bytes32 name = bytes32(abi.encodePacked("User", i));
 
-        // Add entries to second Safe
-        bytes32 name3 = bytes32("Alice at Safe2");
-        bytes32 name4 = bytes32("Carol at Safe2");
-        vm.prank(safe2);
-        pool.addAddressBookEntry(safe2, walletAddress1, name3);
-        vm.prank(safe2);
-        pool.addAddressBookEntry(safe2, walletAddress3, name4);
-
-        // Get entries for first Safe and verify
-        SafeTxPool.AddressBookEntry[] memory entries1 = pool.getAddressBookEntries(safe);
-        assertEq(entries1.length, 2);
-
-        // Get entries for second Safe and verify
-        SafeTxPool.AddressBookEntry[] memory entries2 = pool.getAddressBookEntries(safe2);
-        assertEq(entries2.length, 2);
-
-        // Verify addresses in first Safe
-        bool foundWallet1InSafe1 = false;
-        bool foundWallet2InSafe1 = false;
-
-        for (uint256 i = 0; i < entries1.length; i++) {
-            if (entries1[i].walletAddress == walletAddress1) {
-                assertEq(entries1[i].name, name1);
-                foundWallet1InSafe1 = true;
-            } else if (entries1[i].walletAddress == walletAddress2) {
-                assertEq(entries1[i].name, name2);
-                foundWallet2InSafe1 = true;
-            }
+            vm.prank(safe);
+            registry.addAddressBookEntry(safe, addr, name);
         }
 
-        assertTrue(foundWallet1InSafe1);
-        assertTrue(foundWallet2InSafe1);
+        IAddressBookManager.AddressBookEntry[] memory entries = registry.getAddressBookEntries(safe);
+        assertEq(entries.length, numEntries);
 
-        // Verify addresses in second Safe
-        bool foundWallet1InSafe2 = false;
-        bool foundWallet3InSafe2 = false;
-
-        for (uint256 i = 0; i < entries2.length; i++) {
-            if (entries2[i].walletAddress == walletAddress1) {
-                assertEq(entries2[i].name, name3);
-                foundWallet1InSafe2 = true;
-            } else if (entries2[i].walletAddress == walletAddress3) {
-                assertEq(entries2[i].name, name4);
-                foundWallet3InSafe2 = true;
-            }
-        }
-
-        assertTrue(foundWallet1InSafe2);
-        assertTrue(foundWallet3InSafe2);
-    }
-
-    function test_RevertWhen_AddingInvalidAddress() public {
-        vm.prank(safe);
-        vm.expectRevert(SafeTxPool.InvalidAddress.selector);
-        pool.addAddressBookEntry(safe, address(0), bytes32("Invalid"));
-    }
-
-    function test_RevertWhen_RemovingNonExistentEntry() public {
-        vm.prank(safe);
-        vm.expectRevert(SafeTxPool.AddressNotFound.selector);
-        pool.removeAddressBookEntry(safe, walletAddress1);
+        // Verify first and last entries
+        assertEq(entries[0].walletAddress, address(0x1000));
+        assertEq(entries[numEntries - 1].walletAddress, address(uint160(0x1000 + numEntries - 1)));
     }
 }

@@ -1,12 +1,27 @@
-# Safe Guard Contracts
+# Vito Contracts - Safe Transaction Pool & Guard
 
-This repository contains smart contracts for Safe Guard implementation, which provides delegate call restrictions for Safe multisig wallets.
+This repository contains smart contracts for Safe wallet transaction management and security guards, including a modular SafeTxPool implementation and delegate call restrictions.
 
 ## Overview
 
+### SafeGuard
 The SafeGuard contract is a guard implementation for the Safe (formerly Gnosis Safe) smart contract wallet. It restricts delegate calls to only allowed target addresses, providing an additional layer of security.
 
-The SafeTxPool contract serves as both a transaction pool for Safe transactions and can also function as a Guard that automatically marks transactions as executed after they are processed by the Safe.
+### SafeTxPool (Refactored Modular Architecture)
+The SafeTxPool has been refactored into a modular architecture to solve contract size limitations and improve maintainability:
+
+- **SafeTxPoolRegistry**: Main interface contract (13,240 bytes)
+- **SafeTxPoolCore**: Core transaction pool functionality (10,595 bytes)
+- **AddressBookManager**: Address book management (3,409 bytes)
+- **DelegateCallManager**: Delegate call permissions (4,913 bytes)
+- **TrustedContractManager**: Trusted contract management (1,650 bytes)
+- **TransactionValidator**: Transaction validation logic (5,580 bytes)
+
+**Key Benefits:**
+- ✅ All contracts well within 24KB size limit
+- ✅ 100% backward compatibility with original SafeTxPool
+- ✅ Enhanced security with proper access control
+- ✅ Modular design for easier maintenance and upgrades
 
 ## Development
 
@@ -32,76 +47,280 @@ forge coverage
 
 ## Deployment Guide
 
-### 1. Environment Setup
+### Prerequisites
 
-First, create a `.env` file from the example:
+1. **Install Foundry**: Follow the [Foundry installation guide](https://book.getfoundry.sh/getting-started/installation)
+2. **Clone and setup**:
+   ```bash
+   git clone https://github.com/hadv/vito-contracts
+   cd vito-contracts
+   forge install
+   ```
+
+### Environment Setup
+
+Create a `.env` file from the example:
 
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your values:
-```
-PRIVATE_KEY=your_private_key_without_0x
-RPC_URL=your_rpc_url
+```bash
+PRIVATE_KEY=your_private_key_without_0x_prefix
+RPC_URL=your_rpc_endpoint_url
+ETHERSCAN_API_KEY=your_etherscan_api_key_for_verification
 ```
 
-### 2. Deploy Contract
+### Pre-deployment Checks
 
-Source the environment variables and run the deployment script:
+Always run pre-commit checks before deployment:
 
 ```bash
-source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-url $RPC_URL --broadcast -vvvv
+./scripts/pre-commit-check.sh
 ```
 
-For deploying the SafeTxPool:
+This ensures:
+- ✅ Code formatting is correct
+- ✅ All contracts build successfully
+- ✅ All tests pass (105/105)
+- ✅ Contract sizes are within limits
+
+### Deployment Options
+
+#### Option 1: Deploy SafeTxPool
+
+Deploy the SafeTxPool with modular architecture:
 
 ```bash
-source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool --rpc-url $RPC_URL --broadcast -vvvv
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool --rpc-url $RPC_URL --broadcast --verify -vvvv
 ```
 
-#### Optional Deployment Flags
+**What gets deployed:**
+1. SafeTxPoolCore (transaction management)
+2. AddressBookManager (address book functionality)
+3. DelegateCallManager (delegate call permissions)
+4. TrustedContractManager (trusted contract management)
+5. TransactionValidator (validation logic)
+6. **SafeTxPoolRegistry** (main interface - use this address)
 
-- `--verify`: Verify contract on Etherscan
+#### Option 2: Deploy SafeGuard Only
+
+Deploy just the SafeGuard for delegate call restrictions:
+
+```bash
+source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-url $RPC_URL --broadcast --verify -vvvv
+```
+
+### Deployment Flags
+
+- `--verify`: Verify contracts on Etherscan (recommended)
 - `--chain-id <id>`: Specify network chain ID
 - `--gas-price <price>`: Set specific gas price
 - `--legacy`: For networks not supporting EIP-1559
+- `-vvvv`: Verbose output for debugging
 
-#### Example: Deploy to Sepolia
+### Network-Specific Examples
+
+#### Deploy to Ethereum Mainnet
+```bash
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  --verify \
+  --chain-id 1 \
+  -vvvv
+```
+
+#### Deploy to Sepolia Testnet
+```bash
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  --verify \
+  --chain-id 11155111 \
+  -vvvv
+```
+
+#### Deploy to Polygon
+```bash
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
+  --rpc-url $RPC_URL \
+  --broadcast \
+  --verify \
+  --chain-id 137 \
+  -vvvv
+```
+
+### Post-Deployment Verification
+
+After deployment, verify the contracts are working correctly:
 
 ```bash
-source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-url $RPC_URL --broadcast --chain-id 11155111 -vvvv
+# Check contract sizes
+forge build --sizes
+
+# Run all tests
+forge test
+
+# Check specific contract deployment
+cast code <DEPLOYED_CONTRACT_ADDRESS> --rpc-url $RPC_URL
 ```
 
 ## Contract Usage
 
-### SafeGuard
-
-After deployment, the SafeGuard can be:
-1. Set as a guard on a Safe wallet
-2. Configured with allowed target addresses for delegate calls
-3. Managed by the owner to add/remove allowed targets
-
 ### SafeTxPool
 
-The SafeTxPool contract has dual functionality:
+The SafeTxPool provides comprehensive transaction management with a modular architecture:
 
-1. **Transaction Pool**:
-   - Propose transactions for Safe wallets
-   - Collect signatures from owners
-   - Track pending transactions
-   - Mark transactions as executed
+#### 1. Basic Setup
+```solidity
+// Use the SafeTxPoolRegistry address from deployment
+SafeTxPoolRegistry pool = SafeTxPoolRegistry(DEPLOYED_REGISTRY_ADDRESS);
+```
 
-2. **Guard for Automatic Execution Tracking**:
-   - Implements the Guard interface
-   - Can be set as a Guard on Safe wallets
-   - Automatically marks transactions as executed in the pool when they are executed by the Safe
-   - Directly uses the same transaction hash as the Safe itself (no mapping required)
+#### 2. Transaction Pool Functions
+```solidity
+// Propose a transaction
+pool.proposeTx(txHash, safe, to, value, data, operation, nonce);
 
-To use the SafeTxPool as a Guard:
-1. Deploy the SafeTxPool contract
-2. Set it as a Guard on your Safe wallet using `setGuard`
-3. When a transaction is executed by the Safe, the guard's `checkAfterExecution` will automatically mark it as executed in the pool
+// Sign a transaction
+pool.signTx(txHash, signature);
+
+// Get transaction details
+(safe, to, value, data, operation, proposer, nonce, txId) = pool.getTxDetails(txHash);
+
+// Get pending transactions
+bytes32[] memory pending = pool.getPendingTxHashes(safe, offset, limit);
+```
+
+#### 3. Address Book Management
+```solidity
+// Add address to Safe's address book (only Safe can call)
+pool.addAddressBookEntry(safe, walletAddress, "Recipient Name");
+
+// Remove address from address book
+pool.removeAddressBookEntry(safe, walletAddress);
+
+// Get all address book entries
+IAddressBookManager.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+```
+
+#### 4. Delegate Call Management
+```solidity
+// Enable delegate calls for a Safe
+pool.setDelegateCallEnabled(safe, true);
+
+// Add allowed delegate call target
+pool.addDelegateCallTarget(safe, targetAddress);
+
+// Check if delegate calls are enabled
+bool enabled = pool.isDelegateCallEnabled(safe);
+```
+
+#### 5. Trusted Contract Management
+```solidity
+// Add trusted contract (bypasses some validations)
+pool.addTrustedContract(safe, tokenAddress);
+
+// Check if contract is trusted
+bool trusted = pool.isTrustedContract(safe, contractAddress);
+```
+
+#### 6. Guard Functionality
+Set the SafeTxPoolRegistry as a Guard on your Safe:
+
+```solidity
+// In your Safe wallet, call:
+safe.setGuard(DEPLOYED_REGISTRY_ADDRESS);
+```
+
+**Benefits of using as Guard:**
+- ✅ Automatic transaction validation
+- ✅ Address book enforcement
+- ✅ Delegate call restrictions
+- ✅ Automatic execution tracking
+- ✅ Enhanced security for Safe transactions
+
+### SafeGuard (Standalone)
+
+For delegate call restrictions only:
+
+```solidity
+SafeGuard guard = SafeGuard(DEPLOYED_GUARD_ADDRESS);
+
+// Add allowed target for delegate calls
+guard.addAllowedTarget(targetAddress);
+
+// Set as guard on Safe
+safe.setGuard(address(guard));
+```
+
+### Upgrading from Previous Versions
+
+If you were using an earlier version of SafeTxPool, the current modular architecture is **100% backward compatible**:
+
+```solidity
+// Same interface as before
+SafeTxPoolRegistry pool = SafeTxPoolRegistry(DEPLOYED_REGISTRY_ADDRESS);
+pool.proposeTx(...); // Same function signature
+pool.addAddressBookEntry(...); // Same function signature
+// All existing functions work identically
+```
+
+**Upgrade benefits:**
+- ✅ All contracts within 24KB size limit
+- ✅ Enhanced security with proper access control
+- ✅ Modular architecture for easier maintenance
+- ✅ Same interface - no code changes required
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Contract Size Limit Error
+```
+Error: some contracts exceed the runtime size limit (EIP-170: 24576 bytes)
+```
+**Solution**: Use the refactored SafeTxPool deployment instead of the original.
+
+#### 2. Build Failures
+```bash
+# Clean and rebuild
+forge clean
+forge build
+
+# Check formatting
+forge fmt --check
+```
+
+#### 3. Test Failures
+```bash
+# Run specific test
+forge test --match-contract SafeTxPool -vvv
+
+# Run with gas reporting
+forge test --gas-report
+```
+
+#### 4. Deployment Issues
+- Ensure sufficient ETH balance for gas
+- Check RPC URL is correct
+- Verify private key format (no 0x prefix)
+- For verification, ensure ETHERSCAN_API_KEY is set
+
+### Getting Help
+
+- **Documentation**: See [REFACTORING_GUIDE.md](REFACTORING_GUIDE.md) for detailed architecture information
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/hadv/vito-contracts/issues)
+- **Testing**: Run `./scripts/pre-commit-check.sh` for comprehensive checks
+
+## Architecture
+
+For detailed information about the refactored architecture, contract interactions, and migration guide, see:
+- 📖 [REFACTORING_GUIDE.md](REFACTORING_GUIDE.md) - Comprehensive refactoring documentation
+- 🧪 [test/](test/) - Test files with usage examples
+- 📜 [script/](script/) - Deployment scripts
 
 ## License
 
