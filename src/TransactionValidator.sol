@@ -70,13 +70,9 @@ contract TransactionValidator is ITransactionValidator {
      * @param data Transaction data
      * @param operation Operation type
      */
-    function validateTransaction(
-        address safe,
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) external {
+    function validateTransaction(address safe, address to, uint256 value, bytes memory data, Enum.Operation operation)
+        external
+    {
         TransactionType txType = this.classifyTransaction(to, value, data, operation);
         _validateTransaction(safe, to, value, data, txType);
 

@@ -22,9 +22,8 @@ contract DeployRefactoredSafeTxPool is Script {
 
         // First deploy a placeholder registry to get its address
         console.log("1. Deploying placeholder SafeTxPoolRegistry...");
-        SafeTxPoolRegistry tempRegistry = new SafeTxPoolRegistry(
-            address(0), address(0), address(0), address(0), address(0)
-        );
+        SafeTxPoolRegistry tempRegistry =
+            new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
         address registryAddress = address(tempRegistry);
         console.log("   Placeholder registry address:", registryAddress);
 
@@ -46,10 +45,8 @@ contract DeployRefactoredSafeTxPool is Script {
         console.log("   TrustedContractManager deployed at:", address(trustedContractManager));
 
         console.log("6. Deploying TransactionValidator...");
-        TransactionValidator transactionValidator = new TransactionValidator(
-            address(addressBookManager),
-            address(trustedContractManager)
-        );
+        TransactionValidator transactionValidator =
+            new TransactionValidator(address(addressBookManager), address(trustedContractManager));
         console.log("   TransactionValidator deployed at:", address(transactionValidator));
 
         console.log("7. Deploying final SafeTxPoolRegistry...");

@@ -146,7 +146,11 @@ contract SafeTxPoolRegistry is BaseGuard {
     /**
      * @notice Get all address book entries for a Safe
      */
-    function getAddressBookEntries(address safe) external view returns (IAddressBookManager.AddressBookEntry[] memory) {
+    function getAddressBookEntries(address safe)
+        external
+        view
+        returns (IAddressBookManager.AddressBookEntry[] memory)
+    {
         return addressBookManager.getAddressBookEntries(safe);
     }
 
@@ -269,8 +273,10 @@ contract SafeTxPoolRegistry is BaseGuard {
             if (!isTargetTrusted) {
                 // If delegate calls are enabled, check if there are any specific target restrictions
                 // If the target is not explicitly allowed and there are restrictions, revert
-                if (!delegateCallManager.isDelegateCallTargetAllowed(safe, to) &&
-                    delegateCallManager.hasDelegateCallTargetRestrictions(safe)) {
+                if (
+                    !delegateCallManager.isDelegateCallTargetAllowed(safe, to)
+                        && delegateCallManager.hasDelegateCallTargetRestrictions(safe)
+                ) {
                     revert DelegateCallTargetNotAllowed();
                 }
             }

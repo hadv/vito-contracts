@@ -28,19 +28,14 @@ contract RefactoredSafeTxPoolTest is Test {
         txPoolCore = new SafeTxPoolCore();
 
         // Deploy the actual registry first to get its address
-        registry = new SafeTxPoolRegistry(
-            address(0), address(0), address(0), address(0), address(0)
-        );
+        registry = new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
 
         // Deploy managers with the actual registry address
         addressBookManager = new AddressBookManager(address(registry));
         delegateCallManager = new DelegateCallManager(address(registry));
         trustedContractManager = new TrustedContractManager(address(registry));
 
-        transactionValidator = new TransactionValidator(
-            address(addressBookManager),
-            address(trustedContractManager)
-        );
+        transactionValidator = new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
         // Deploy a new registry with all the correct components
         registry = new SafeTxPoolRegistry(
@@ -55,14 +50,14 @@ contract RefactoredSafeTxPoolTest is Test {
     function testRefactoredContractSizes() public {
         // Verify that all contracts are within reasonable size limits
         // This is more of a documentation test to show the size improvements
-        
+
         uint256 txPoolCoreSize = address(txPoolCore).code.length;
         uint256 addressBookSize = address(addressBookManager).code.length;
         uint256 delegateCallSize = address(delegateCallManager).code.length;
         uint256 trustedContractSize = address(trustedContractManager).code.length;
         uint256 validatorSize = address(transactionValidator).code.length;
         uint256 registrySize = address(registry).code.length;
-        
+
         console.log("Contract sizes:");
         console.log("SafeTxPoolCore:         ", txPoolCoreSize);
         console.log("AddressBookManager:     ", addressBookSize);
@@ -70,7 +65,7 @@ contract RefactoredSafeTxPoolTest is Test {
         console.log("TrustedContractManager: ", trustedContractSize);
         console.log("TransactionValidator:   ", validatorSize);
         console.log("SafeTxPoolRegistry:     ", registrySize);
-        
+
         // All contracts should be well under the 24KB limit
         assertLt(txPoolCoreSize, 24576, "SafeTxPoolCore too large");
         assertLt(addressBookSize, 24576, "AddressBookManager too large");

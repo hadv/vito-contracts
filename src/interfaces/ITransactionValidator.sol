@@ -15,6 +15,7 @@ interface ITransactionValidator {
         ERC20_TRANSFER_FROM, // ERC20 token transferFrom
         CONTRACT_INTERACTION, // General contract interaction
         DELEGATE_CALL // Delegate call operation
+
     }
 
     // Events
@@ -33,12 +34,10 @@ interface ITransactionValidator {
      * @param operation Operation type
      * @return txType The classified transaction type
      */
-    function classifyTransaction(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) external pure returns (TransactionType);
+    function classifyTransaction(address to, uint256 value, bytes memory data, Enum.Operation operation)
+        external
+        pure
+        returns (TransactionType);
 
     /**
      * @notice Validate transaction based on its type and Safe's configuration
@@ -48,11 +47,6 @@ interface ITransactionValidator {
      * @param data Transaction data
      * @param operation Operation type
      */
-    function validateTransaction(
-        address safe,
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) external;
+    function validateTransaction(address safe, address to, uint256 value, bytes memory data, Enum.Operation operation)
+        external;
 }

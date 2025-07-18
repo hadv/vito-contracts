@@ -31,14 +31,17 @@ contract SafeTxPoolFactory {
      * @return trustedContractManager The TrustedContractManager contract address
      * @return transactionValidator The TransactionValidator contract address
      */
-    function deploySafeTxPool() external returns (
-        address registry,
-        address txPoolCore,
-        address addressBookManager,
-        address delegateCallManager,
-        address trustedContractManager,
-        address transactionValidator
-    ) {
+    function deploySafeTxPool()
+        external
+        returns (
+            address registry,
+            address txPoolCore,
+            address addressBookManager,
+            address delegateCallManager,
+            address trustedContractManager,
+            address transactionValidator
+        )
+    {
         // Use CREATE2 to predict the registry address
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, block.timestamp));
 
@@ -47,12 +50,11 @@ contract SafeTxPoolFactory {
             type(SafeTxPoolRegistry).creationCode,
             abi.encode(address(0), address(0), address(0), address(0), address(0))
         );
-        registry = address(uint160(uint256(keccak256(abi.encodePacked(
-            bytes1(0xff),
-            address(this),
-            salt,
-            keccak256(registryBytecode)
-        )))));
+        registry = address(
+            uint160(
+                uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(registryBytecode))))
+            )
+        );
 
         // Deploy core components with predicted registry address
         txPoolCore = address(new SafeTxPoolCore());
@@ -61,30 +63,18 @@ contract SafeTxPoolFactory {
         trustedContractManager = address(new TrustedContractManager(registry));
 
         // Deploy transaction validator with dependencies
-        transactionValidator = address(new TransactionValidator(
-            addressBookManager,
-            trustedContractManager
-        ));
+        transactionValidator = address(new TransactionValidator(addressBookManager, trustedContractManager));
 
         // Deploy the actual registry with CREATE2
         SafeTxPoolRegistry actualRegistry = new SafeTxPoolRegistry{salt: salt}(
-            txPoolCore,
-            addressBookManager,
-            delegateCallManager,
-            trustedContractManager,
-            transactionValidator
+            txPoolCore, addressBookManager, delegateCallManager, trustedContractManager, transactionValidator
         );
 
         // Verify the address matches our prediction
         require(address(actualRegistry) == registry, "Registry address mismatch");
 
         emit SafeTxPoolDeployed(
-            registry,
-            txPoolCore,
-            addressBookManager,
-            delegateCallManager,
-            trustedContractManager,
-            transactionValidator
+            registry, txPoolCore, addressBookManager, delegateCallManager, trustedContractManager, transactionValidator
         );
     }
 }

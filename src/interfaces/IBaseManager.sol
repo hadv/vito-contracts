@@ -7,7 +7,7 @@ pragma solidity ^0.8.13;
  */
 interface IBaseManager {
     // Events
-    
+
     // Errors
     error NotSafeWallet();
     error InvalidAddress();
