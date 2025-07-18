@@ -19,8 +19,8 @@ interface IBaseManager {
     function registry() external view returns (address);
 
     /**
-     * @notice Update the registry address
-     * @param _newRegistry The new registry contract address
+     * @notice Set the registry address (only callable once)
+     * @param _registry The new registry contract address
      */
-    function updateRegistry(address _newRegistry) external;
+    function setRegistry(address _registry) external;
 }

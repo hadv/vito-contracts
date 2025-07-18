@@ -26,15 +26,15 @@ contract DeploySafeTxPool is Script {
         console.log("   SafeTxPoolCore deployed at:", address(txPoolCore));
 
         console.log("2. Deploying AddressBookManager...");
-        AddressBookManager addressBookManager = new AddressBookManager(address(0));
+        AddressBookManager addressBookManager = new AddressBookManager();
         console.log("   AddressBookManager deployed at:", address(addressBookManager));
 
         console.log("3. Deploying DelegateCallManager...");
-        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
+        DelegateCallManager delegateCallManager = new DelegateCallManager();
         console.log("   DelegateCallManager deployed at:", address(delegateCallManager));
 
         console.log("4. Deploying TrustedContractManager...");
-        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
+        TrustedContractManager trustedContractManager = new TrustedContractManager();
         console.log("   TrustedContractManager deployed at:", address(trustedContractManager));
 
         console.log("5. Deploying TransactionValidator...");
@@ -52,19 +52,19 @@ contract DeploySafeTxPool is Script {
         );
         console.log("   SafeTxPoolRegistry deployed at:", address(registry));
 
-        // Update all components to use the correct registry address
-        console.log("7. Updating component registry addresses...");
+        // Set registry addresses for all components (one-time only)
+        console.log("7. Setting component registry addresses...");
         txPoolCore.setRegistry(address(registry));
-        console.log("   SafeTxPoolCore registry updated");
+        console.log("   SafeTxPoolCore registry set");
 
-        addressBookManager.updateRegistry(address(registry));
-        console.log("   AddressBookManager registry updated");
+        addressBookManager.setRegistry(address(registry));
+        console.log("   AddressBookManager registry set");
 
-        delegateCallManager.updateRegistry(address(registry));
-        console.log("   DelegateCallManager registry updated");
+        delegateCallManager.setRegistry(address(registry));
+        console.log("   DelegateCallManager registry set");
 
-        trustedContractManager.updateRegistry(address(registry));
-        console.log("   TrustedContractManager registry updated");
+        trustedContractManager.setRegistry(address(registry));
+        console.log("   TrustedContractManager registry set");
 
         vm.stopBroadcast();
 

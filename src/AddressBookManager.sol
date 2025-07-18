@@ -12,8 +12,6 @@ contract AddressBookManager is BaseManager, IAddressBookManager {
     // Mapping from Safe address to its array of address book entries
     mapping(address => AddressBookEntry[]) private addressBooks;
 
-    constructor(address _registry) BaseManager(_registry) {}
-
     /**
      * @notice Add an entry to the address book of a Safe
      * @param safe The Safe wallet address that owns this address book

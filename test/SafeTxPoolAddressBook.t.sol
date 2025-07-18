@@ -23,9 +23,9 @@ contract SafeTxPoolAddressBookTest is Test {
     function setUp() public {
         // Deploy components with new pattern
         txPoolCore = new SafeTxPoolCore();
-        addressBookManager = new AddressBookManager(address(0));
-        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
-        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
+        addressBookManager = new AddressBookManager();
+        DelegateCallManager delegateCallManager = new DelegateCallManager();
+        TrustedContractManager trustedContractManager = new TrustedContractManager();
 
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
@@ -38,11 +38,11 @@ contract SafeTxPoolAddressBookTest is Test {
             address(transactionValidator)
         );
 
-        // Update all components to use the correct registry address
+        // Set registry addresses for all components (one-time only)
         txPoolCore.setRegistry(address(registry));
-        addressBookManager.updateRegistry(address(registry));
-        delegateCallManager.updateRegistry(address(registry));
-        trustedContractManager.updateRegistry(address(registry));
+        addressBookManager.setRegistry(address(registry));
+        delegateCallManager.setRegistry(address(registry));
+        trustedContractManager.setRegistry(address(registry));
     }
 
     function testAddAddressBookEntry() public {
