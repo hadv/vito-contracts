@@ -2,22 +2,25 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import "../src/SafeTxPool.sol";
+import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafeTxPoolCore.sol";
+import "../src/AddressBookManager.sol";
+import "../src/DelegateCallManager.sol";
+import "../src/TrustedContractManager.sol";
+import "../src/TransactionValidator.sol";
+import "../src/interfaces/IAddressBookManager.sol";
 import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 /**
  * @title DelegateCallGuardExample
- * @dev Example script demonstrating how to use the SafeTxPool delegate call guard functionality
+ * @dev Example script demonstrating how to use the SafeTxPoolRegistry delegate call guard functionality
  */
 contract DelegateCallGuardExample is Script {
-    SafeTxPool public pool;
+    SafeTxPoolRegistry public pool;
     address public safe;
     address public targetContract;
 
     function setUp() public {
-        // Deploy SafeTxPool
-        pool = new SafeTxPool();
-
         // For this example, we'll use the deployer as the "Safe"
         safe = msg.sender;
         targetContract = address(0x1234567890123456789012345678901234567890);
@@ -26,8 +29,26 @@ contract DelegateCallGuardExample is Script {
     function run() public {
         vm.startBroadcast();
 
-        // Deploy the SafeTxPool
-        pool = new SafeTxPool();
+        // Deploy the modular SafeTxPool components
+        SafeTxPoolRegistry tempRegistry =
+            new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
+        address registryAddress = address(tempRegistry);
+
+        SafeTxPoolCore txPoolCore = new SafeTxPoolCore();
+        AddressBookManager addressBookManager = new AddressBookManager(registryAddress);
+        DelegateCallManager delegateCallManager = new DelegateCallManager(registryAddress);
+        TrustedContractManager trustedContractManager = new TrustedContractManager(registryAddress);
+        TransactionValidator transactionValidator =
+            new TransactionValidator(address(addressBookManager), address(trustedContractManager));
+
+        // Deploy the final SafeTxPoolRegistry
+        pool = new SafeTxPoolRegistry(
+            address(txPoolCore),
+            address(addressBookManager),
+            address(delegateCallManager),
+            address(trustedContractManager),
+            address(transactionValidator)
+        );
 
         console.log("SafeTxPool deployed at:", address(pool));
         console.log("Example Safe address:", safe);
@@ -53,7 +74,7 @@ contract DelegateCallGuardExample is Script {
         pool.addAddressBookEntry(safe, targetContract, "Example Target Contract");
 
         // Get address book entries to verify
-        SafeTxPool.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
+        IAddressBookManager.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
         console.log("Address book entries count:", entries.length);
         if (entries.length > 0) {
             console.log("First entry address:", entries[0].walletAddress);

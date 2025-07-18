@@ -88,9 +88,9 @@ This ensures:
 
 ### Deployment Options
 
-#### Option 1: Deploy Refactored SafeTxPool (Recommended)
+#### Option 1: Deploy SafeTxPool (Modular Architecture)
 
-Deploy the new modular SafeTxPool architecture:
+Deploy the modular SafeTxPool architecture:
 
 ```bash
 source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefactoredSafeTxPool --rpc-url $RPC_URL --broadcast --verify -vvvv
@@ -104,15 +104,7 @@ source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefact
 5. TransactionValidator (validation logic)
 6. **SafeTxPoolRegistry** (main interface - use this address)
 
-#### Option 2: Deploy Original SafeTxPool
-
-Deploy the original monolithic SafeTxPool:
-
-```bash
-source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool --rpc-url $RPC_URL --broadcast --verify -vvvv
-```
-
-#### Option 3: Deploy SafeGuard Only
+#### Option 2: Deploy SafeGuard Only
 
 Deploy just the SafeGuard for delegate call restrictions:
 
@@ -264,23 +256,23 @@ guard.addAllowedTarget(targetAddress);
 safe.setGuard(address(guard));
 ```
 
-### Migration from Original SafeTxPool
+### Upgrading from Previous Versions
 
-The refactored SafeTxPool is **100% backward compatible**:
+If you were using an earlier version of SafeTxPool, the new modular architecture is **100% backward compatible**:
 
 ```solidity
-// Old code works unchanged
-SafeTxPool pool = SafeTxPool(DEPLOYED_REGISTRY_ADDRESS);
+// Same interface as before
+SafeTxPoolRegistry pool = SafeTxPoolRegistry(DEPLOYED_REGISTRY_ADDRESS);
 pool.proposeTx(...); // Same function signature
 pool.addAddressBookEntry(...); // Same function signature
 // All existing functions work identically
 ```
 
-**Migration steps:**
-1. Deploy the refactored SafeTxPool using the deployment script
-2. Update your contract addresses to use the SafeTxPoolRegistry address
-3. No code changes required - all functions work identically
-4. Optionally update Safe Guards to use the new registry address
+**Upgrade benefits:**
+- ✅ All contracts within 24KB size limit
+- ✅ Enhanced security with proper access control
+- ✅ Modular architecture for easier maintenance
+- ✅ Same interface - no code changes required
 
 ## Troubleshooting
 
