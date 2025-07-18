@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "./IBaseManager.sol";
+
 /**
  * @title ITrustedContractManager
  * @notice Interface for managing trusted contracts for Safe wallets
  */
-interface ITrustedContractManager {
+interface ITrustedContractManager is IBaseManager {
     // Events
     event TrustedContractAdded(address indexed safe, address indexed contractAddress);
     event TrustedContractRemoved(address indexed safe, address indexed contractAddress);
 
-    // Errors
-    error InvalidAddress();
-    error NotSafeWallet();
+    // Errors (inherited from IBaseManager: InvalidAddress, NotSafeWallet)
 
     /**
      * @notice Add a trusted contract for a Safe

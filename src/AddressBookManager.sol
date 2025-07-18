@@ -2,26 +2,17 @@
 pragma solidity ^0.8.13;
 
 import "./interfaces/IAddressBookManager.sol";
+import "./base/BaseManager.sol";
 
 /**
  * @title AddressBookManager
  * @notice Manages address books for Safe wallets
  */
-contract AddressBookManager is IAddressBookManager {
+contract AddressBookManager is BaseManager, IAddressBookManager {
     // Mapping from Safe address to its array of address book entries
     mapping(address => AddressBookEntry[]) private addressBooks;
 
-    // Registry contract that can call this manager
-    address public immutable registry;
-
-    constructor(address _registry) {
-        registry = _registry;
-    }
-
-    modifier onlySafeOrRegistry(address safe) {
-        if (msg.sender != safe && msg.sender != registry) revert NotSafeWallet();
-        _;
-    }
+    constructor(address _registry) BaseManager(_registry) {}
 
     /**
      * @notice Add an entry to the address book of a Safe

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "./IBaseManager.sol";
+
 /**
  * @title IAddressBookManager
  * @notice Interface for managing address books for Safe wallets
  */
-interface IAddressBookManager {
+interface IAddressBookManager is IBaseManager {
     // Simple struct for address book entries
     struct AddressBookEntry {
         bytes32 name; // Limited to 32 bytes
@@ -16,10 +18,8 @@ interface IAddressBookManager {
     event AddressBookEntryAdded(address indexed safe, address indexed walletAddress, bytes32 name);
     event AddressBookEntryRemoved(address indexed safe, address indexed walletAddress);
 
-    // Errors
-    error InvalidAddress();
+    // Errors (inherited from IBaseManager: InvalidAddress, NotSafeWallet)
     error AddressNotFound();
-    error NotSafeWallet();
 
     /**
      * @notice Add an entry to the address book of a Safe

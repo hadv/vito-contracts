@@ -2,26 +2,17 @@
 pragma solidity ^0.8.13;
 
 import "./interfaces/ITrustedContractManager.sol";
+import "./base/BaseManager.sol";
 
 /**
  * @title TrustedContractManager
  * @notice Manages trusted contracts for Safe wallets
  */
-contract TrustedContractManager is ITrustedContractManager {
+contract TrustedContractManager is BaseManager, ITrustedContractManager {
     // Contract whitelist for trusted contracts (like token contracts)
     mapping(address => mapping(address => bool)) private trustedContracts;
 
-    // Registry contract that can call this manager
-    address public immutable registry;
-
-    constructor(address _registry) {
-        registry = _registry;
-    }
-
-    modifier onlySafeOrRegistry(address safe) {
-        if (msg.sender != safe && msg.sender != registry) revert NotSafeWallet();
-        _;
-    }
+    constructor(address _registry) BaseManager(_registry) {}
 
     /**
      * @notice Add a trusted contract for a Safe

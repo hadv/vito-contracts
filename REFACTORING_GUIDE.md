@@ -44,6 +44,11 @@ The contract has been refactored into 6 smaller contracts:
 - **Features**: Unified interface to all components, Guard implementation, access control validation
 - **Access Control**: Validates Safe wallet ownership before delegating to managers
 
+### 7. **BaseManager** (Base Contract)
+- **Responsibility**: Common functionality for all manager contracts
+- **Features**: Registry reference, access control modifier, common error definitions
+- **Benefits**: Eliminates code duplication, ensures consistent access control pattern
+
 ## Benefits
 
 ### Size Reduction
@@ -56,6 +61,7 @@ The contract has been refactored into 6 smaller contracts:
 - **No Direct Access**: Prevents unauthorized direct calls to manager contracts
 - **Registry Validation**: Registry validates Safe ownership before delegating calls
 - **Principle of Least Privilege**: Each component has minimal required permissions
+- **Base Contract Pattern**: Consistent access control implementation across all managers
 
 ### Modularity
 - **Single Responsibility**: Each contract has one clear purpose

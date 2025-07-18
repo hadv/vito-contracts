@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import "./IBaseManager.sol";
+
 /**
  * @title IDelegateCallManager
  * @notice Interface for managing delegate call permissions for Safe wallets
  */
-interface IDelegateCallManager {
+interface IDelegateCallManager is IBaseManager {
     // Events
     event DelegateCallToggled(address indexed safe, bool enabled);
     event DelegateCallTargetAdded(address indexed safe, address indexed target);
     event DelegateCallTargetRemoved(address indexed safe, address indexed target);
 
-    // Errors
-    error InvalidAddress();
-    error NotSafeWallet();
+    // Errors (inherited from IBaseManager: InvalidAddress, NotSafeWallet)
     error DelegateCallDisabled();
     error DelegateCallTargetNotAllowed();
 

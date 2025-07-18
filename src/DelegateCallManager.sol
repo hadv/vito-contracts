@@ -2,12 +2,13 @@
 pragma solidity ^0.8.13;
 
 import "./interfaces/IDelegateCallManager.sol";
+import "./base/BaseManager.sol";
 
 /**
  * @title DelegateCallManager
  * @notice Manages delegate call permissions for Safe wallets
  */
-contract DelegateCallManager is IDelegateCallManager {
+contract DelegateCallManager is BaseManager, IDelegateCallManager {
     // Delegate call control mappings
     mapping(address => bool) private delegateCallEnabled;
     mapping(address => mapping(address => bool)) private allowedDelegateCallTargets;
@@ -17,17 +18,7 @@ contract DelegateCallManager is IDelegateCallManager {
     mapping(address => address[]) private delegateCallTargetsList;
     mapping(address => mapping(address => uint256)) private delegateCallTargetIndex;
 
-    // Registry contract that can call this manager
-    address public immutable registry;
-
-    constructor(address _registry) {
-        registry = _registry;
-    }
-
-    modifier onlySafeOrRegistry(address safe) {
-        if (msg.sender != safe && msg.sender != registry) revert NotSafeWallet();
-        _;
-    }
+    constructor(address _registry) BaseManager(_registry) {}
 
     /**
      * @notice Enable or disable delegate calls for a Safe
