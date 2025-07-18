@@ -112,7 +112,7 @@ SafeTxPoolRegistry registry = new SafeTxPoolRegistry(
 ### Deployment Script
 Use the provided deployment script:
 ```bash
-forge script script/DeployRefactoredSafeTxPool.s.sol --rpc-url <RPC_URL> --broadcast
+forge script script/DeploySafeTxPool.s.sol --rpc-url <RPC_URL> --broadcast
 ```
 
 ## Interface Compatibility

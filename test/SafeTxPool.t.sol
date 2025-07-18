@@ -11,7 +11,7 @@ import "../src/SafeTxPoolRegistry.sol";
 import "../src/interfaces/IBaseManager.sol";
 import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
-contract RefactoredSafeTxPoolTest is Test {
+contract SafeTxPoolTest is Test {
     SafeTxPoolCore public txPoolCore;
     AddressBookManager public addressBookManager;
     DelegateCallManager public delegateCallManager;
@@ -47,7 +47,7 @@ contract RefactoredSafeTxPoolTest is Test {
         );
     }
 
-    function testRefactoredContractSizes() public {
+    function testContractSizes() public {
         // Verify that all contracts are within reasonable size limits
         // This is more of a documentation test to show the size improvements
 

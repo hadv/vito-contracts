@@ -10,15 +10,15 @@ import "../src/TransactionValidator.sol";
 import "../src/SafeTxPoolRegistry.sol";
 
 /**
- * @title DeployRefactoredSafeTxPool
- * @notice Deployment script for the refactored SafeTxPool components
+ * @title DeploySafeTxPool
+ * @notice Deployment script for the SafeTxPool components
  */
-contract DeployRefactoredSafeTxPool is Script {
+contract DeploySafeTxPool is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        console.log("Deploying refactored SafeTxPool components...");
+        console.log("Deploying SafeTxPool components...");
 
         // First deploy a placeholder registry to get its address
         console.log("1. Deploying placeholder SafeTxPoolRegistry...");

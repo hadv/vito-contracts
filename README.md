@@ -88,12 +88,12 @@ This ensures:
 
 ### Deployment Options
 
-#### Option 1: Deploy SafeTxPool (Modular Architecture)
+#### Option 1: Deploy SafeTxPool
 
-Deploy the modular SafeTxPool architecture:
+Deploy the SafeTxPool with modular architecture:
 
 ```bash
-source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefactoredSafeTxPool --rpc-url $RPC_URL --broadcast --verify -vvvv
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool --rpc-url $RPC_URL --broadcast --verify -vvvv
 ```
 
 **What gets deployed:**
@@ -124,7 +124,7 @@ source .env && forge script script/DeploySafeGuard.s.sol:DeploySafeGuard --rpc-u
 
 #### Deploy to Ethereum Mainnet
 ```bash
-source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefactoredSafeTxPool \
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
   --rpc-url $RPC_URL \
   --broadcast \
   --verify \
@@ -134,7 +134,7 @@ source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefact
 
 #### Deploy to Sepolia Testnet
 ```bash
-source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefactoredSafeTxPool \
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
   --rpc-url $RPC_URL \
   --broadcast \
   --verify \
@@ -144,7 +144,7 @@ source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefact
 
 #### Deploy to Polygon
 ```bash
-source .env && forge script script/DeployRefactoredSafeTxPool.s.sol:DeployRefactoredSafeTxPool \
+source .env && forge script script/DeploySafeTxPool.s.sol:DeploySafeTxPool \
   --rpc-url $RPC_URL \
   --broadcast \
   --verify \
@@ -169,9 +169,9 @@ cast code <DEPLOYED_CONTRACT_ADDRESS> --rpc-url $RPC_URL
 
 ## Contract Usage
 
-### SafeTxPool (Refactored) - Recommended
+### SafeTxPool
 
-The refactored SafeTxPool provides the same interface as the original but with improved architecture:
+The SafeTxPool provides comprehensive transaction management with a modular architecture:
 
 #### 1. Basic Setup
 ```solidity
@@ -258,7 +258,7 @@ safe.setGuard(address(guard));
 
 ### Upgrading from Previous Versions
 
-If you were using an earlier version of SafeTxPool, the new modular architecture is **100% backward compatible**:
+If you were using an earlier version of SafeTxPool, the current modular architecture is **100% backward compatible**:
 
 ```solidity
 // Same interface as before
