@@ -14,6 +14,9 @@ import "./interfaces/ITransactionValidator.sol";
  * @notice Main coordinator contract that provides a unified interface to all Safe transaction pool components
  */
 contract SafeTxPoolRegistry is BaseGuard {
+    // Custom errors
+    error NotProposer();
+
     ISafeTxPoolCore public immutable txPoolCore;
     IAddressBookManager public immutable addressBookManager;
     IDelegateCallManager public immutable delegateCallManager;
@@ -62,7 +65,7 @@ contract SafeTxPoolRegistry is BaseGuard {
         Enum.Operation operation,
         uint256 nonce
     ) external {
-        txPoolCore.proposeTx(txHash, safe, to, value, data, operation, nonce);
+        txPoolCore.proposeTxWithProposer(txHash, safe, to, value, data, operation, nonce, msg.sender);
     }
 
     /**
@@ -83,6 +86,12 @@ contract SafeTxPoolRegistry is BaseGuard {
      * @notice Delete a pending transaction
      */
     function deleteTx(bytes32 txHash) external {
+        // Get transaction details to check if caller is the proposer
+        (,,,,, address proposer,,) = txPoolCore.getTxDetails(txHash);
+
+        // Check if caller is the proposer
+        if (msg.sender != proposer) revert NotProposer();
+
         txPoolCore.deleteTx(txHash);
     }
 

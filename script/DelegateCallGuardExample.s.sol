@@ -30,18 +30,14 @@ contract DelegateCallGuardExample is Script {
         vm.startBroadcast();
 
         // Deploy the modular SafeTxPool components
-        SafeTxPoolRegistry tempRegistry =
-            new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
-        address registryAddress = address(tempRegistry);
-
         SafeTxPoolCore txPoolCore = new SafeTxPoolCore();
-        AddressBookManager addressBookManager = new AddressBookManager(registryAddress);
-        DelegateCallManager delegateCallManager = new DelegateCallManager(registryAddress);
-        TrustedContractManager trustedContractManager = new TrustedContractManager(registryAddress);
+        AddressBookManager addressBookManager = new AddressBookManager(address(0));
+        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
+        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
-        // Deploy the final SafeTxPoolRegistry
+        // Deploy the SafeTxPoolRegistry
         pool = new SafeTxPoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
@@ -49,6 +45,12 @@ contract DelegateCallGuardExample is Script {
             address(trustedContractManager),
             address(transactionValidator)
         );
+
+        // Update all components to use the correct registry address
+        txPoolCore.setRegistry(address(pool));
+        addressBookManager.updateRegistry(address(pool));
+        delegateCallManager.updateRegistry(address(pool));
+        trustedContractManager.updateRegistry(address(pool));
 
         console.log("SafeTxPool deployed at:", address(pool));
         console.log("Example Safe address:", safe);

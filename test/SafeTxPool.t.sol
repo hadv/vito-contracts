@@ -24,20 +24,17 @@ contract SafeTxPoolTest is Test {
     address public recipient = address(0x9ABC);
 
     function setUp() public {
-        // Deploy all components first
+        // Deploy all components with new pattern
         txPoolCore = new SafeTxPoolCore();
 
-        // Deploy the actual registry first to get its address
-        registry = new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
-
-        // Deploy managers with the actual registry address
-        addressBookManager = new AddressBookManager(address(registry));
-        delegateCallManager = new DelegateCallManager(address(registry));
-        trustedContractManager = new TrustedContractManager(address(registry));
+        // Deploy managers with zero address initially
+        addressBookManager = new AddressBookManager(address(0));
+        delegateCallManager = new DelegateCallManager(address(0));
+        trustedContractManager = new TrustedContractManager(address(0));
 
         transactionValidator = new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
-        // Deploy a new registry with all the correct components
+        // Deploy registry with all components
         registry = new SafeTxPoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
@@ -45,6 +42,12 @@ contract SafeTxPoolTest is Test {
             address(trustedContractManager),
             address(transactionValidator)
         );
+
+        // Update all components to use the correct registry address
+        txPoolCore.setRegistry(address(registry));
+        addressBookManager.updateRegistry(address(registry));
+        delegateCallManager.updateRegistry(address(registry));
+        trustedContractManager.updateRegistry(address(registry));
     }
 
     function testContractSizes() public {

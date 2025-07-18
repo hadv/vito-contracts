@@ -17,4 +17,10 @@ interface IBaseManager {
      * @return registry The registry contract address
      */
     function registry() external view returns (address);
+
+    /**
+     * @notice Update the registry address
+     * @param _newRegistry The new registry contract address
+     */
+    function updateRegistry(address _newRegistry) external;
 }

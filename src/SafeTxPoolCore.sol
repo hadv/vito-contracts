@@ -9,6 +9,9 @@ import "./interfaces/ISafeTxPoolCore.sol";
  * @notice Core Safe transaction pool functionality
  */
 contract SafeTxPoolCore is ISafeTxPoolCore {
+    // Registry contract that can call this core
+    address public registry;
+
     // Counter for transaction IDs
     uint256 private _txIdCounter;
 
@@ -20,6 +23,16 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
 
     // Mapping from Safe address to array of pending transaction hashes
     mapping(address => bytes32[]) private pendingTxsBySafe;
+
+    /**
+     * @notice Set the registry address (only callable once)
+     * @param _registry The registry contract address
+     */
+    function setRegistry(address _registry) external {
+        require(registry == address(0), "Registry already set");
+        require(_registry != address(0), "Invalid registry address");
+        registry = _registry;
+    }
 
     /**
      * @notice Propose a new Safe transaction
@@ -40,6 +53,34 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         Enum.Operation operation,
         uint256 nonce
     ) external {
+        _proposeTx(txHash, safe, to, value, data, operation, nonce, msg.sender);
+    }
+
+    function proposeTxWithProposer(
+        bytes32 txHash,
+        address safe,
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 nonce,
+        address proposer
+    ) external {
+        // Only registry can call this function
+        require(msg.sender == registry, "Only registry can specify proposer");
+        _proposeTx(txHash, safe, to, value, data, operation, nonce, proposer);
+    }
+
+    function _proposeTx(
+        bytes32 txHash,
+        address safe,
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 nonce,
+        address proposer
+    ) internal {
         // Ensure transaction hasn't been proposed before
         require(transactions[txHash].proposer == address(0), "Transaction already proposed");
 
@@ -52,7 +93,7 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         newTx.value = value;
         newTx.data = data;
         newTx.operation = operation;
-        newTx.proposer = msg.sender;
+        newTx.proposer = proposer;
         newTx.nonce = nonce;
         newTx.txId = txId;
 
@@ -60,7 +101,7 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         pendingTxsBySafe[safe].push(txHash);
 
         // Emit event
-        emit TransactionProposed(txHash, msg.sender, safe, to, value, data, operation, nonce, txId);
+        emit TransactionProposed(txHash, proposer, safe, to, value, data, operation, nonce, txId);
     }
 
     /**
@@ -99,8 +140,8 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         // Check if transaction exists
         if (safeTx.proposer == address(0)) revert TransactionNotFound();
 
-        // Check if caller is the Safe wallet or this contract (when called from checkAfterExecution)
-        if (msg.sender != safeTx.safe && msg.sender != address(this)) revert NotSafeWallet();
+        // Check if caller is the Safe wallet, this contract, or the registry
+        if (msg.sender != safeTx.safe && msg.sender != address(this) && msg.sender != registry) revert NotSafeWallet();
 
         uint256 txId = safeTx.txId;
         address safe = safeTx.safe;
@@ -124,8 +165,8 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         // Check if transaction exists
         if (safeTx.proposer == address(0)) revert TransactionNotFound();
 
-        // Check if caller is the proposer
-        if (msg.sender != safeTx.proposer) revert NotProposer();
+        // Check if caller is the proposer or the registry (which handles access control)
+        if (msg.sender != safeTx.proposer && msg.sender != registry) revert NotProposer();
 
         // Get Safe address and transaction ID before deletion
         address safe = safeTx.safe;

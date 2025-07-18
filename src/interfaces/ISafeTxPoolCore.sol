@@ -75,6 +75,20 @@ interface ISafeTxPoolCore {
     ) external;
 
     /**
+     * @notice Propose a new Safe transaction with explicit proposer (only callable by registry)
+     */
+    function proposeTxWithProposer(
+        bytes32 txHash,
+        address safe,
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 nonce,
+        address proposer
+    ) external;
+
+    /**
      * @notice Sign a proposed transaction
      * @param txHash Hash of the Safe transaction to sign
      * @param signature Owner's signature of the transaction

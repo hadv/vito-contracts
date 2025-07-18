@@ -20,36 +20,29 @@ contract DeploySafeTxPool is Script {
 
         console.log("Deploying SafeTxPool components...");
 
-        // First deploy a placeholder registry to get its address
-        console.log("1. Deploying placeholder SafeTxPoolRegistry...");
-        SafeTxPoolRegistry tempRegistry =
-            new SafeTxPoolRegistry(address(0), address(0), address(0), address(0), address(0));
-        address registryAddress = address(tempRegistry);
-        console.log("   Placeholder registry address:", registryAddress);
-
-        // Deploy core components with the registry address
-        console.log("2. Deploying SafeTxPoolCore...");
+        // Deploy core components first
+        console.log("1. Deploying SafeTxPoolCore...");
         SafeTxPoolCore txPoolCore = new SafeTxPoolCore();
         console.log("   SafeTxPoolCore deployed at:", address(txPoolCore));
 
-        console.log("3. Deploying AddressBookManager...");
-        AddressBookManager addressBookManager = new AddressBookManager(registryAddress);
+        console.log("2. Deploying AddressBookManager...");
+        AddressBookManager addressBookManager = new AddressBookManager(address(0));
         console.log("   AddressBookManager deployed at:", address(addressBookManager));
 
-        console.log("4. Deploying DelegateCallManager...");
-        DelegateCallManager delegateCallManager = new DelegateCallManager(registryAddress);
+        console.log("3. Deploying DelegateCallManager...");
+        DelegateCallManager delegateCallManager = new DelegateCallManager(address(0));
         console.log("   DelegateCallManager deployed at:", address(delegateCallManager));
 
-        console.log("5. Deploying TrustedContractManager...");
-        TrustedContractManager trustedContractManager = new TrustedContractManager(registryAddress);
+        console.log("4. Deploying TrustedContractManager...");
+        TrustedContractManager trustedContractManager = new TrustedContractManager(address(0));
         console.log("   TrustedContractManager deployed at:", address(trustedContractManager));
 
-        console.log("6. Deploying TransactionValidator...");
+        console.log("5. Deploying TransactionValidator...");
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
         console.log("   TransactionValidator deployed at:", address(transactionValidator));
 
-        console.log("7. Deploying final SafeTxPoolRegistry...");
+        console.log("6. Deploying SafeTxPoolRegistry...");
         SafeTxPoolRegistry registry = new SafeTxPoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
@@ -57,7 +50,21 @@ contract DeploySafeTxPool is Script {
             address(trustedContractManager),
             address(transactionValidator)
         );
-        console.log("   Final SafeTxPoolRegistry deployed at:", address(registry));
+        console.log("   SafeTxPoolRegistry deployed at:", address(registry));
+
+        // Update all components to use the correct registry address
+        console.log("7. Updating component registry addresses...");
+        txPoolCore.setRegistry(address(registry));
+        console.log("   SafeTxPoolCore registry updated");
+
+        addressBookManager.updateRegistry(address(registry));
+        console.log("   AddressBookManager registry updated");
+
+        delegateCallManager.updateRegistry(address(registry));
+        console.log("   DelegateCallManager registry updated");
+
+        trustedContractManager.updateRegistry(address(registry));
+        console.log("   TrustedContractManager registry updated");
 
         vm.stopBroadcast();
 
