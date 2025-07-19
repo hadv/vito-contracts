@@ -221,10 +221,13 @@ bool enabled = pool.isDelegateCallEnabled(safe);
 #### 5. Trusted Contract Management
 ```solidity
 // Add trusted contract (bypasses some validations)
-pool.addTrustedContract(safe, tokenAddress);
+pool.addTrustedContract(safe, tokenAddress, "Token Name");
 
 // Check if contract is trusted
 bool trusted = pool.isTrustedContract(safe, contractAddress);
+
+// Get all trusted contracts
+ITrustedContractManager.TrustedContractEntry[] memory contracts = pool.getTrustedContracts(safe);
 ```
 
 #### 6. Guard Functionality

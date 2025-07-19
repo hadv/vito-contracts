@@ -8,8 +8,14 @@ import "./IBaseManager.sol";
  * @notice Interface for managing trusted contracts for Safe wallets
  */
 interface ITrustedContractManager is IBaseManager {
+    // Simple struct for trusted contract entries
+    struct TrustedContractEntry {
+        bytes32 name; // Limited to 32 bytes
+        address contractAddress; // Mandatory
+    }
+
     // Events
-    event TrustedContractAdded(address indexed safe, address indexed contractAddress);
+    event TrustedContractAdded(address indexed safe, address indexed contractAddress, bytes32 name);
     event TrustedContractRemoved(address indexed safe, address indexed contractAddress);
 
     // Errors (inherited from IBaseManager: InvalidAddress, NotSafeWallet)
@@ -18,8 +24,9 @@ interface ITrustedContractManager is IBaseManager {
      * @notice Add a trusted contract for a Safe
      * @param safe The Safe wallet address
      * @param contractAddress The contract address to trust
+     * @param name Name associated with the contract (32 bytes)
      */
-    function addTrustedContract(address safe, address contractAddress) external;
+    function addTrustedContract(address safe, address contractAddress, bytes32 name) external;
 
     /**
      * @notice Remove a trusted contract for a Safe
@@ -35,4 +42,11 @@ interface ITrustedContractManager is IBaseManager {
      * @return isTrusted Whether the contract is trusted
      */
     function isTrustedContract(address safe, address contractAddress) external view returns (bool);
+
+    /**
+     * @notice Get all trusted contract entries for a Safe
+     * @param safe The Safe wallet address
+     * @return entries Array of trusted contract entries
+     */
+    function getTrustedContracts(address safe) external view returns (TrustedContractEntry[] memory);
 }

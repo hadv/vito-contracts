@@ -219,8 +219,8 @@ contract SafeTxPoolRegistry is BaseGuard {
     /**
      * @notice Add a trusted contract for a Safe
      */
-    function addTrustedContract(address safe, address contractAddress) external onlySafe(safe) {
-        trustedContractManager.addTrustedContract(safe, contractAddress);
+    function addTrustedContract(address safe, address contractAddress, bytes32 name) external onlySafe(safe) {
+        trustedContractManager.addTrustedContract(safe, contractAddress, name);
     }
 
     /**
@@ -235,6 +235,17 @@ contract SafeTxPoolRegistry is BaseGuard {
      */
     function isTrustedContract(address safe, address contractAddress) external view returns (bool) {
         return trustedContractManager.isTrustedContract(safe, contractAddress);
+    }
+
+    /**
+     * @notice Get all trusted contract entries for a Safe
+     */
+    function getTrustedContracts(address safe)
+        external
+        view
+        returns (ITrustedContractManager.TrustedContractEntry[] memory)
+    {
+        return trustedContractManager.getTrustedContracts(safe);
     }
 
     // ============ Guard Interface Implementation ============

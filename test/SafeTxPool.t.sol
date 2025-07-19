@@ -94,7 +94,7 @@ contract SafeTxPoolTest is Test {
         // Try to call TrustedContractManager directly (should fail)
         vm.prank(owner1);
         vm.expectRevert(IBaseManager.NotSafeWallet.selector);
-        trustedContractManager.addTrustedContract(safe, recipient);
+        trustedContractManager.addTrustedContract(safe, recipient, "Test Contract");
     }
 
     function testSafeCanCallManagersDirectly() public {

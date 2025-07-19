@@ -268,7 +268,7 @@ contract SafeTxPoolGuardTest is Test {
 
         // Add trusted contract
         vm.prank(safe);
-        registry.addTrustedContract(safe, trustedContract);
+        registry.addTrustedContract(safe, trustedContract, "Trusted Contract");
 
         // Also add to address book (trusted contracts still need to be in address book for basic validation)
         vm.prank(safe);

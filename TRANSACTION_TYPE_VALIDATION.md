@@ -53,13 +53,16 @@ The system introduces a "trusted contracts" concept for frequently used contract
 
 ```solidity
 // Add a trusted contract
-function addTrustedContract(address safe, address contractAddress) external;
+function addTrustedContract(address safe, address contractAddress, bytes32 name) external;
 
 // Remove a trusted contract
 function removeTrustedContract(address safe, address contractAddress) external;
 
 // Check if a contract is trusted
 function isTrustedContract(address safe, address contractAddress) external view returns (bool);
+
+// Get all trusted contracts
+function getTrustedContracts(address safe) external view returns (TrustedContractEntry[] memory);
 ```
 
 ## Validation Logic
@@ -96,10 +99,10 @@ error ContractNotTrusted();         // Contract not trusted and not in address b
 safeTxPool.addAddressBookEntry(safeAddress, recipientAddress, "Alice");
 
 // 2. Add trusted contracts (tokens, DEXs, protocols, etc.)
-safeTxPool.addTrustedContract(safeAddress, usdcTokenAddress);
-safeTxPool.addTrustedContract(safeAddress, daiTokenAddress);
-safeTxPool.addTrustedContract(safeAddress, uniswapRouterAddress);
-safeTxPool.addTrustedContract(safeAddress, aavePoolAddress);
+safeTxPool.addTrustedContract(safeAddress, usdcTokenAddress, "USDC Token");
+safeTxPool.addTrustedContract(safeAddress, daiTokenAddress, "DAI Token");
+safeTxPool.addTrustedContract(safeAddress, uniswapRouterAddress, "Uniswap Router");
+safeTxPool.addTrustedContract(safeAddress, aavePoolAddress, "Aave Pool");
 
 // 3. Now you can interact with trusted contracts without adding them to address book
 // - Send tokens to Alice using trusted token contracts
@@ -187,7 +190,7 @@ unknownContract.someFunction(...);
 The system emits events for monitoring and debugging:
 
 ```solidity
-event TrustedContractAdded(address indexed safe, address indexed contractAddress);
+event TrustedContractAdded(address indexed safe, address indexed contractAddress, bytes32 name);
 event TrustedContractRemoved(address indexed safe, address indexed contractAddress);
 event TransactionValidated(address indexed safe, address indexed to, TransactionType txType);
 ```
