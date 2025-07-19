@@ -485,13 +485,13 @@ contract SafeTxPoolGuardTest is Test {
         registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce1);
 
         vm.prank(owner2);
-        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, nonce1); // Same nonce as txHash1
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, nonce1); // Same nonce
 
         vm.prank(owner1);
         registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, nonce2);
 
         vm.prank(owner2);
-        registry.proposeTx(txHash4, safe, recipient, 4 ether, data, Enum.Operation.Call, nonce2); // Same nonce as txHash3
+        registry.proposeTx(txHash4, safe, recipient, 4 ether, data, Enum.Operation.Call, nonce2); // Same nonce
 
         // Verify all transactions exist
         bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
