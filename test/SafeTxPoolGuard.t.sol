@@ -66,11 +66,6 @@ contract SafeTxPoolGuardTest is Test {
     event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
     event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
 
-    // Events for testing
-    event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
-    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
-    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
-
     function setUp() public {
         // Deploy components with new pattern
         txPoolCore = new SafeTxPoolCore();
