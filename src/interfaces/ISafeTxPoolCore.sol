@@ -102,6 +102,13 @@ interface ISafeTxPoolCore {
     function markAsExecuted(bytes32 txHash) external;
 
     /**
+     * @notice Mark a transaction as executed by Safe address (handles nonce mismatch)
+     * @param safeAddress Address of the Safe wallet
+     * @param executionTxHash Hash from Safe execution (may not match stored hash due to nonce difference)
+     */
+    function markAsExecutedBySafe(address safeAddress, bytes32 executionTxHash) external;
+
+    /**
      * @notice Delete a pending transaction
      * @param txHash Hash of the Safe transaction to delete
      */

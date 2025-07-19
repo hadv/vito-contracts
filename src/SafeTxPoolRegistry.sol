@@ -309,19 +309,20 @@ contract SafeTxPoolRegistry is BaseGuard {
     /**
      * @notice Implementation of the Guard interface's checkAfterExecution function
      * @dev This function is called after a Safe transaction is executed
-     * @param txHash Hash of the Safe transaction
+     * @param txHash Hash of the Safe transaction (calculated with current nonce)
      * @param success Whether the transaction was successful
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
         // Only proceed if transaction was successful
         if (!success) return;
 
-        // Since the transaction hash is the same in the pool and in the Safe,
-        // we can directly try to mark the transaction as executed
-        try txPoolCore.markAsExecuted(txHash) {
+        // The txHash from Safe contract uses current nonce, but SafeTxPool stores
+        // hash with nonce at proposal time. We need to find and mark the correct transaction.
+        try txPoolCore.markAsExecutedBySafe(msg.sender, txHash) {
             // Transaction was successfully marked as executed
         } catch {
             // Transaction might not exist in the pool, which is fine
+            // This can happen for transactions not created through SafeTxPool
         }
     }
 

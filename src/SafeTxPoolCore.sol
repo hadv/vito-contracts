@@ -156,6 +156,69 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
     }
 
     /**
+     * @notice Mark a transaction as executed by Safe address (handles nonce mismatch)
+     * @dev This method finds the transaction by Safe address and marks the most recent one as executed
+     * @param safeAddress Address of the Safe wallet
+     * @param executionTxHash Hash from Safe execution (may not match stored hash due to nonce difference)
+     */
+    function markAsExecutedBySafe(address safeAddress, bytes32 executionTxHash) external {
+        // Only allow calls from the Safe itself or the registry
+        if (msg.sender != safeAddress && msg.sender != registry) revert NotSafeWallet();
+
+        // Get pending transactions for this Safe
+        bytes32[] storage pendingTxs = pendingTransactions[safeAddress];
+
+        if (pendingTxs.length == 0) {
+            // No pending transactions, nothing to mark as executed
+            return;
+        }
+
+        // Find the most recent executable transaction (with enough signatures)
+        bytes32 txHashToExecute;
+        uint256 indexToRemove;
+        bool found = false;
+
+        // Check transactions in reverse order (most recent first)
+        for (uint256 i = pendingTxs.length; i > 0; i--) {
+            uint256 index = i - 1;
+            bytes32 txHash = pendingTxs[index];
+            SafeTx storage safeTx = transactions[txHash];
+
+            if (safeTx.proposer != address(0)) {
+                // Check if this transaction has enough signatures to be executable
+                uint256 signatureCount = 0;
+                for (uint256 j = 0; j < safeTx.signatures.length; j++) {
+                    if (safeTx.signatures[j].length > 0) {
+                        signatureCount++;
+                    }
+                }
+
+                // If this transaction is executable, mark it as executed
+                if (signatureCount > 0) {
+                    txHashToExecute = txHash;
+                    indexToRemove = index;
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (found) {
+            SafeTx storage safeTx = transactions[txHashToExecute];
+            uint256 txId = safeTx.txId;
+
+            // Remove from pending transactions array
+            pendingTxs[indexToRemove] = pendingTxs[pendingTxs.length - 1];
+            pendingTxs.pop();
+
+            // Delete transaction data
+            delete transactions[txHashToExecute];
+
+            emit TransactionExecuted(txHashToExecute, safeAddress, txId);
+        }
+    }
+
+    /**
      * @notice Delete a pending transaction
      * @param txHash Hash of the Safe transaction to delete
      */
