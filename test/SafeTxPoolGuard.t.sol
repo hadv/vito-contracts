@@ -329,7 +329,7 @@ contract SafeTxPoolGuardTest is Test {
         registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         // Get transaction ID for event verification
-        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
         // Expect TransactionExecuted event to be emitted when guard calls markAsExecuted
         vm.expectEmit(true, true, false, true);
@@ -358,8 +358,8 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(pending.length, 2);
 
         // Get transaction IDs for event verification
-        (,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
-        (,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+        (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
 
         // Expect events for both transactions being removed due to nonce consumption
         vm.expectEmit(true, true, false, true);
@@ -402,7 +402,7 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(txSafe, safe);
 
         // Get transaction ID for event verification
-        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
         // Expect TransactionExecuted event to be emitted
         vm.expectEmit(true, true, false, true);
@@ -453,7 +453,7 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(signatures.length, 2);
 
         // Get transaction ID for event verification
-        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
         // Expect TransactionExecuted event
         vm.expectEmit(true, true, false, true);
@@ -498,8 +498,8 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(pending.length, 4);
 
         // Get transaction IDs for event verification
-        (,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
-        (,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+        (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
 
         // Expect events for nonce1 transactions being removed
         vm.expectEmit(true, true, false, true);
@@ -612,7 +612,7 @@ contract SafeTxPoolGuardTest is Test {
         registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
         // Get transaction ID for event verification
-        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
         // Expect TransactionExecuted event to be emitted during MockSafe execution
         vm.expectEmit(true, true, false, true);

@@ -166,7 +166,7 @@ contract SafeTxPoolCoreTest is Test {
         registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce);
 
         // Get transaction details before execution to verify event parameters
-        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
         // Expect TransactionExecuted event to be emitted
         vm.expectEmit(true, true, false, true);
@@ -304,8 +304,8 @@ contract SafeTxPoolCoreTest is Test {
         registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, sameNonce);
 
         // Get transaction IDs for event verification
-        (,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
-        (,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+        (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
 
         // Expect TransactionExecuted event for the executed transaction
         vm.expectEmit(true, true, false, true);
