@@ -306,6 +306,9 @@ contract SafeTxPoolRegistry is BaseGuard {
         transactionValidator.validateTransaction(safe, to, value, data, operation);
     }
 
+    // Events for debugging guard execution
+    event GuardNotSuccess(bytes32 indexed txHash, address indexed safe);
+
     /**
      * @notice Implementation of the Guard interface's checkAfterExecution function
      * @dev This function is called after a Safe transaction is executed
@@ -314,7 +317,10 @@ contract SafeTxPoolRegistry is BaseGuard {
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
         // Only proceed if transaction was successful
-        if (!success) return;
+        if (!success) {
+            emit GuardNotSuccess(txHash, msg.sender);
+            return;
+        }
 
         // Since the transaction hash is the same in the pool and in the Safe,
         // we can directly try to mark the transaction as executed
