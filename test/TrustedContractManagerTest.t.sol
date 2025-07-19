@@ -13,7 +13,7 @@ import "../src/interfaces/ITrustedContractManager.sol";
 contract TrustedContractManagerTest is Test {
     SafeTxPoolRegistry public registry;
     TrustedContractManager public trustedContractManager;
-    
+
     address public safe = address(0x1234);
     address public contract1 = address(0x5678);
     address public contract2 = address(0x9ABC);
@@ -25,10 +25,8 @@ contract TrustedContractManagerTest is Test {
         AddressBookManager addressBookManager = new AddressBookManager();
         DelegateCallManager delegateCallManager = new DelegateCallManager();
         trustedContractManager = new TrustedContractManager();
-        TransactionValidator transactionValidator = new TransactionValidator(
-            address(addressBookManager),
-            address(trustedContractManager)
-        );
+        TransactionValidator transactionValidator =
+            new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
         // Deploy registry
         registry = new SafeTxPoolRegistry(
@@ -52,7 +50,7 @@ contract TrustedContractManagerTest is Test {
 
         // Check if contract is trusted
         assertTrue(registry.isTrustedContract(safe, contract1));
-        
+
         // Get all trusted contracts
         ITrustedContractManager.TrustedContractEntry[] memory contracts = registry.getTrustedContracts(safe);
         assertEq(contracts.length, 1);
@@ -63,10 +61,10 @@ contract TrustedContractManagerTest is Test {
     function testAddMultipleTrustedContracts() public {
         vm.prank(safe);
         registry.addTrustedContract(safe, contract1, "Contract 1");
-        
+
         vm.prank(safe);
         registry.addTrustedContract(safe, contract2, "Contract 2");
-        
+
         vm.prank(safe);
         registry.addTrustedContract(safe, contract3, "Contract 3");
 
@@ -74,17 +72,17 @@ contract TrustedContractManagerTest is Test {
         assertTrue(registry.isTrustedContract(safe, contract1));
         assertTrue(registry.isTrustedContract(safe, contract2));
         assertTrue(registry.isTrustedContract(safe, contract3));
-        
+
         // Get all trusted contracts
         ITrustedContractManager.TrustedContractEntry[] memory contracts = registry.getTrustedContracts(safe);
         assertEq(contracts.length, 3);
-        
+
         // Check each contract
         bool found1 = false;
         bool found2 = false;
         bool found3 = false;
-        
-        for (uint i = 0; i < contracts.length; i++) {
+
+        for (uint256 i = 0; i < contracts.length; i++) {
             if (contracts[i].contractAddress == contract1 && contracts[i].name == "Contract 1") {
                 found1 = true;
             } else if (contracts[i].contractAddress == contract2 && contracts[i].name == "Contract 2") {
@@ -93,7 +91,7 @@ contract TrustedContractManagerTest is Test {
                 found3 = true;
             }
         }
-        
+
         assertTrue(found1);
         assertTrue(found2);
         assertTrue(found3);
@@ -103,11 +101,11 @@ contract TrustedContractManagerTest is Test {
         // Add contract
         vm.prank(safe);
         registry.addTrustedContract(safe, contract1, "Old Name");
-        
+
         // Update name
         vm.prank(safe);
         registry.addTrustedContract(safe, contract1, "New Name");
-        
+
         // Check updated name
         ITrustedContractManager.TrustedContractEntry[] memory contracts = registry.getTrustedContracts(safe);
         assertEq(contracts.length, 1);
@@ -119,18 +117,18 @@ contract TrustedContractManagerTest is Test {
         // Add contracts
         vm.prank(safe);
         registry.addTrustedContract(safe, contract1, "Contract 1");
-        
+
         vm.prank(safe);
         registry.addTrustedContract(safe, contract2, "Contract 2");
-        
+
         // Remove one contract
         vm.prank(safe);
         registry.removeTrustedContract(safe, contract1);
-        
+
         // Check contract1 is no longer trusted
         assertFalse(registry.isTrustedContract(safe, contract1));
         assertTrue(registry.isTrustedContract(safe, contract2));
-        
+
         // Check only contract2 remains
         ITrustedContractManager.TrustedContractEntry[] memory contracts = registry.getTrustedContracts(safe);
         assertEq(contracts.length, 1);
@@ -146,7 +144,7 @@ contract TrustedContractManagerTest is Test {
 
     function testOnlyAuthorizedCanAddTrustedContract() public {
         address unauthorized = address(0xBAD);
-        
+
         vm.prank(unauthorized);
         vm.expectRevert();
         registry.addTrustedContract(safe, contract1, "Contract 1");

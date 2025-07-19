@@ -18,7 +18,10 @@ contract TrustedContractManager is BaseManager, ITrustedContractManager {
      * @param contractAddress The contract address to trust
      * @param name Name associated with the contract (32 bytes)
      */
-    function addTrustedContract(address safe, address contractAddress, bytes32 name) external onlySafeOrRegistry(safe) {
+    function addTrustedContract(address safe, address contractAddress, bytes32 name)
+        external
+        onlySafeOrRegistry(safe)
+    {
         // Validate contract address
         if (contractAddress == address(0)) revert InvalidAddress();
 
