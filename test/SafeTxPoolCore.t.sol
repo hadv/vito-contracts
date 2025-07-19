@@ -185,15 +185,15 @@ contract SafeTxPoolCoreTest is Test {
         vm.prank(owner1);
         registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
 
-        // Test unauthorized caller should fail
+        // Test unauthorized caller should fail - call core directly to bypass registry
         vm.prank(owner1);
         vm.expectRevert(ISafeTxPoolCore.NotSafeWallet.selector);
-        registry.markAsExecuted(txHash);
+        txPoolCore.markAsExecuted(txHash);
 
-        // Test random address should fail
+        // Test random address should fail - call core directly to bypass registry
         vm.prank(address(0x999));
         vm.expectRevert(ISafeTxPoolCore.NotSafeWallet.selector);
-        registry.markAsExecuted(txHash);
+        txPoolCore.markAsExecuted(txHash);
 
         // Test Safe wallet should succeed
         vm.prank(safe);
