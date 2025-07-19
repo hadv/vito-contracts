@@ -36,9 +36,6 @@ contract MockSafe {
         address payable refundReceiver,
         bytes memory signatures
     ) external returns (bool success) {
-        // Use current nonce for hash calculation
-        uint256 currentNonce = nonce;
-
         bytes32 txHash = keccak256(
             abi.encode(
                 to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, block.chainid
@@ -530,11 +527,14 @@ contract SafeTxPoolGuardTest is Test {
         // Get transaction ID for event verification
         (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
 
-        // Expect TransactionRemovedFromPending event for single transaction
+        // Events are emitted in this order for single transaction:
+        // 1. TransactionRemovedFromPending event (always emitted)
+        // 2. TransactionExecuted event
+        // Note: BatchTransactionsRemovedFromPending is NOT emitted for single transaction
+
         vm.expectEmit(true, true, false, true);
         emit TransactionRemovedFromPending(txHash, safe, txId, "nonce_consumed");
 
-        // Expect TransactionExecuted event
         vm.expectEmit(true, true, false, true);
         emit TransactionExecuted(txHash, safe, txId);
 
