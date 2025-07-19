@@ -58,7 +58,18 @@ contract SafeTxPoolGuardTest is Test {
 
     address public safe;
     address public owner1 = address(0x5678);
-    address public recipient = address(0x9ABC);
+    address public owner2 = address(0x9ABC);
+    address public recipient = address(0xDEF0);
+
+    // Events for testing
+    event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
+    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
+    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
+
+    // Events for testing
+    event TransactionExecuted(bytes32 indexed txHash, address indexed safe, uint256 txId);
+    event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
+    event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
 
     function setUp() public {
         // Deploy components with new pattern
@@ -314,6 +325,220 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(txSafe, address(0)); // Should be empty/deleted
     }
 
+    function testGuardMarkAsExecutedWithEventEmission() public {
+        bytes32 txHash = keccak256("guard event test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Get transaction ID for event verification
+        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+
+        // Expect TransactionExecuted event to be emitted when guard calls markAsExecuted
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash, safe, txId);
+
+        // Call checkAfterExecution (simulating Safe calling after execution)
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+    }
+
+    function testGuardMarkAsExecutedWithMultipleSameNonce() public {
+        bytes32 txHash1 = keccak256("guard multi nonce 1");
+        bytes32 txHash2 = keccak256("guard multi nonce 2");
+        bytes memory data = "";
+        uint256 sameNonce = 20;
+
+        // Propose multiple transactions with same nonce
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, sameNonce);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, sameNonce);
+
+        // Verify both transactions exist
+        bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 2);
+
+        // Get transaction IDs for event verification
+        (,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+
+        // Expect events for both transactions being removed due to nonce consumption
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash1, safe, txId1);
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_consumed");
+
+        vm.expectEmit(true, false, false, true);
+        emit BatchTransactionsRemovedFromPending(safe, sameNonce, 2, "nonce_consumed");
+
+        // Execute first transaction through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        // Verify both transactions are removed
+        (address txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (address txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        assertEq(txSafe1, address(0));
+        assertEq(txSafe2, address(0));
+
+        // Verify pending list is empty
+        pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 0);
+    }
+
+    function testGuardMarkAsExecutedTryCatchSuccess() public {
+        bytes32 txHash = keccak256("try catch success test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Verify transaction exists
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, safe);
+
+        // Get transaction ID for event verification
+        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+
+        // Expect TransactionExecuted event to be emitted
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash, safe, txId);
+
+        // Call checkAfterExecution - should successfully mark as executed
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Verify transaction was removed
+        (txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+    }
+
+    function testGuardMarkAsExecutedTryCatchWithNonExistentTransaction() public {
+        bytes32 nonExistentTxHash = keccak256("non existent transaction");
+
+        // Call checkAfterExecution with non-existent transaction
+        // Should not revert due to try-catch mechanism
+        vm.prank(safe);
+        registry.checkAfterExecution(nonExistentTxHash, true);
+
+        // No transaction should exist (obviously)
+        (address txSafe,,,,,,,) = registry.getTxDetails(nonExistentTxHash);
+        assertEq(txSafe, address(0));
+    }
+
+    function testGuardMarkAsExecutedWithSignedTransaction() public {
+        bytes32 txHash = keccak256("signed transaction test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Add signatures
+        bytes memory signature1 = "signature1";
+        bytes memory signature2 = "signature2";
+
+        vm.prank(owner1);
+        registry.signTx(txHash, signature1);
+
+        vm.prank(owner2);
+        registry.signTx(txHash, signature2);
+
+        // Verify signatures exist
+        bytes[] memory signatures = registry.getSignatures(txHash);
+        assertEq(signatures.length, 2);
+
+        // Get transaction ID for event verification
+        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+
+        // Expect TransactionExecuted event
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash, safe, txId);
+
+        // Mark as executed through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Verify transaction and signatures are completely removed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+
+        signatures = registry.getSignatures(txHash);
+        assertEq(signatures.length, 0);
+    }
+
+    function testGuardMarkAsExecutedWithComplexNonceScenario() public {
+        bytes32 txHash1 = keccak256("complex nonce 1");
+        bytes32 txHash2 = keccak256("complex nonce 2");
+        bytes32 txHash3 = keccak256("complex nonce 3");
+        bytes32 txHash4 = keccak256("complex nonce 4");
+        bytes memory data = "";
+        uint256 nonce1 = 10;
+        uint256 nonce2 = 11;
+
+        // Propose multiple transactions with different nonces
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce1);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, nonce1); // Same nonce as txHash1
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, nonce2);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash4, safe, recipient, 4 ether, data, Enum.Operation.Call, nonce2); // Same nonce as txHash3
+
+        // Verify all transactions exist
+        bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 4);
+
+        // Get transaction IDs for event verification
+        (,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+
+        // Expect events for nonce1 transactions being removed
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash1, safe, txId1);
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_consumed");
+
+        vm.expectEmit(true, false, false, true);
+        emit BatchTransactionsRemovedFromPending(safe, nonce1, 2, "nonce_consumed");
+
+        // Execute transaction with nonce1 through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        // Verify nonce1 transactions are removed, nonce2 transactions remain
+        (address txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (address txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        (address txSafe3,,,,,,,) = registry.getTxDetails(txHash3);
+        (address txSafe4,,,,,,,) = registry.getTxDetails(txHash4);
+
+        assertEq(txSafe1, address(0)); // Removed
+        assertEq(txSafe2, address(0)); // Removed (same nonce)
+        assertEq(txSafe3, safe); // Remains
+        assertEq(txSafe4, safe); // Remains
+
+        // Verify pending list contains only nonce2 transactions
+        pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 2);
+    }
+
     function testGuardReentrancyProtection() public {
         bytes32 txHash = keccak256("reentrancy test");
 
@@ -348,5 +573,170 @@ contract SafeTxPoolGuardTest is Test {
 
         assertEq(txSafe1, address(0)); // Should be deleted
         assertEq(txSafe2, safe); // Should still exist
+    }
+
+    function testGuardMarkAsExecutedAccessControlThroughGuard() public {
+        bytes32 txHash = keccak256("guard access control test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Only the Safe should be able to call checkAfterExecution
+        // Test unauthorized caller should fail
+        vm.prank(owner1);
+        vm.expectRevert(); // Should revert due to access control in markAsExecuted
+        registry.checkAfterExecution(txHash, true);
+
+        // Test random address should fail
+        vm.prank(address(0x999));
+        vm.expectRevert(); // Should revert due to access control in markAsExecuted
+        registry.checkAfterExecution(txHash, true);
+
+        // Test Safe wallet should succeed
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Verify transaction was removed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+    }
+
+    function testGuardMarkAsExecutedWithMockSafeIntegration() public {
+        bytes memory data = "";
+        bytes memory signatures = "";
+
+        // Create the same hash that MockSafe will create
+        bytes32 txHash = keccak256(
+            abi.encode(recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
+        );
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // Get transaction ID for event verification
+        (,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+
+        // Expect TransactionExecuted event to be emitted during MockSafe execution
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash, safe, txId);
+
+        // Execute transaction through MockSafe (which calls guard)
+        mockSafe.execTransaction(
+            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+        );
+
+        // Verify transaction was automatically marked as executed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+    }
+
+    function testGuardMarkAsExecutedSequentialTransactions() public {
+        bytes32 txHash1 = keccak256("sequential 1");
+        bytes32 txHash2 = keccak256("sequential 2");
+        bytes32 txHash3 = keccak256("sequential 3");
+        bytes memory data = "";
+
+        // Propose multiple transactions with sequential nonces
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, 1);
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, 2);
+
+        // Verify all transactions exist
+        bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 3);
+
+        // Execute transactions in order through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash2, true);
+
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash3, true);
+
+        // Verify all transactions are removed
+        (address txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (address txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        (address txSafe3,,,,,,,) = registry.getTxDetails(txHash3);
+
+        assertEq(txSafe1, address(0));
+        assertEq(txSafe2, address(0));
+        assertEq(txSafe3, address(0));
+
+        // Verify pending list is empty
+        pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 0);
+    }
+
+    function testGuardMarkAsExecutedWithDifferentSafes() public {
+        address safe2 = address(0x2468);
+        bytes32 txHash1 = keccak256("safe1 transaction");
+        bytes32 txHash2 = keccak256("safe2 transaction");
+        bytes memory data = "";
+
+        // Add safe2 to address book
+        vm.prank(safe2);
+        registry.addAddressBookEntry(safe2, recipient, "Recipient for Safe2");
+
+        // Propose transactions for different Safes
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash2, safe2, recipient, 2 ether, data, Enum.Operation.Call, 0);
+
+        // Verify both transactions exist
+        (address txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (address txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        assertEq(txSafe1, safe);
+        assertEq(txSafe2, safe2);
+
+        // Execute transaction for safe1
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        // Verify only safe1 transaction is removed
+        (txSafe1,,,,,,,) = registry.getTxDetails(txHash1);
+        (txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        assertEq(txSafe1, address(0)); // Removed
+        assertEq(txSafe2, safe2); // Still exists
+
+        // Execute transaction for safe2
+        vm.prank(safe2);
+        registry.checkAfterExecution(txHash2, true);
+
+        // Verify safe2 transaction is also removed
+        (txSafe2,,,,,,,) = registry.getTxDetails(txHash2);
+        assertEq(txSafe2, address(0));
+    }
+
+    function testGuardMarkAsExecutedErrorHandling() public {
+        bytes32 txHash = keccak256("error handling test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // First execution should succeed
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Verify transaction was removed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+
+        // Second execution of same transaction should not revert due to try-catch
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true); // Should not revert
     }
 }
