@@ -381,6 +381,134 @@ contract SafeTxPoolGuardTest is Test {
         assertEq(pending.length, 0);
     }
 
+    function testGuardMarkAsExecutedEmitsTransactionRemovedFromPendingEvent() public {
+        bytes32 txHash = keccak256("guard single removal event");
+        bytes memory data = "";
+        uint256 nonce = 50;
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce);
+
+        // Get transaction ID for event verification
+        (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
+
+        // Expect TransactionRemovedFromPending event for single transaction
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash, safe, txId, "nonce_consumed");
+
+        // Expect TransactionExecuted event
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash, safe, txId);
+
+        // Execute through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+    }
+
+    function testGuardMarkAsExecutedEmitsBatchTransactionsRemovedFromPendingEvent() public {
+        bytes32 txHash1 = keccak256("guard batch removal 1");
+        bytes32 txHash2 = keccak256("guard batch removal 2");
+        bytes32 txHash3 = keccak256("guard batch removal 3");
+        bytes32 txHash4 = keccak256("guard batch removal 4");
+        bytes memory data = "";
+        uint256 sameNonce = 55;
+
+        // Propose multiple transactions with same nonce
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, sameNonce);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, sameNonce);
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, sameNonce);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash4, safe, recipient, 4 ether, data, Enum.Operation.Call, sameNonce);
+
+        // Get transaction IDs for event verification
+        (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+        (,,,,,,, uint256 txId3) = registry.getTxDetails(txHash3);
+        (,,,,,,, uint256 txId4) = registry.getTxDetails(txHash4);
+
+        // Expect TransactionRemovedFromPending events for all transactions
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash3, safe, txId3, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash4, safe, txId4, "nonce_consumed");
+
+        // Expect BatchTransactionsRemovedFromPending event (4 transactions)
+        vm.expectEmit(true, false, false, true);
+        emit BatchTransactionsRemovedFromPending(safe, sameNonce, 4, "nonce_consumed");
+
+        // Expect TransactionExecuted event for the executed transaction
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash1, safe, txId1);
+
+        // Execute through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+    }
+
+    function testGuardMarkAsExecutedWithMixedNoncesEventEmission() public {
+        bytes32 txHash1 = keccak256("guard mixed nonce 1");
+        bytes32 txHash2 = keccak256("guard mixed nonce 2");
+        bytes32 txHash3 = keccak256("guard mixed nonce 3");
+        bytes32 txHash4 = keccak256("guard mixed nonce 4");
+        bytes memory data = "";
+        uint256 nonce1 = 60;
+        uint256 nonce2 = 61;
+
+        // Propose transactions with mixed nonces
+        vm.prank(owner1);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce1);
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, nonce1); // Same as txHash1
+
+        vm.prank(owner1);
+        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, nonce2); // Different nonce
+
+        vm.prank(owner2);
+        registry.proposeTx(txHash4, safe, recipient, 4 ether, data, Enum.Operation.Call, nonce2); // Same as txHash3
+
+        // Get transaction IDs for event verification
+        (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
+        (,,,,,,, uint256 txId2) = registry.getTxDetails(txHash2);
+
+        // Expect TransactionRemovedFromPending events only for same nonce transactions (nonce1)
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash1, safe, txId1, "nonce_consumed");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionRemovedFromPending(txHash2, safe, txId2, "nonce_consumed");
+
+        // Expect BatchTransactionsRemovedFromPending event (2 transactions with nonce1)
+        vm.expectEmit(true, false, false, true);
+        emit BatchTransactionsRemovedFromPending(safe, nonce1, 2, "nonce_consumed");
+
+        // Expect TransactionExecuted event
+        vm.expectEmit(true, true, false, true);
+        emit TransactionExecuted(txHash1, safe, txId1);
+
+        // Execute through guard
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash1, true);
+
+        // Verify nonce2 transactions still exist in pending list
+        bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
+        assertEq(pending.length, 2); // txHash3 and txHash4 should remain
+    }
+
     function testGuardMarkAsExecutedTryCatchSuccess() public {
         bytes32 txHash = keccak256("try catch success test");
         bytes memory data = "";
