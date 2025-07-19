@@ -512,17 +512,14 @@ contract SafeTxPoolGuardTest is Test {
     }
 
     function testSafeExecutionTriggersTransactionRemovedFromPendingEvent() public {
-        bytes memory data = "";
-        bytes memory signatures = "";
-
         // Create the same hash that MockSafe will create
         bytes32 txHash = keccak256(
-            abi.encode(recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
+            abi.encode(recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
         );
 
         // Propose transaction
         vm.prank(owner1);
-        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, "", Enum.Operation.Call, 0);
 
         // Get transaction ID for event verification
         (,,,,,,, uint256 txId) = registry.getTxDetails(txHash);
@@ -540,38 +537,32 @@ contract SafeTxPoolGuardTest is Test {
 
         // Execute transaction through MockSafe (which triggers guard)
         mockSafe.execTransaction(
-            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+            recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), ""
         );
     }
 
     function testSafeExecutionTriggersBatchTransactionsRemovedFromPendingEvent() public {
-        bytes memory data = "";
-        bytes memory signatures = "";
-        uint256 nonce = 0; // Use nonce 0 to match MockSafe hash calculation
-
         // Create transaction hash that matches MockSafe calculation
         bytes32 txHash1 = keccak256(
-            abi.encode(recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
+            abi.encode(recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
         );
-        bytes32 txHash2 = keccak256("additional tx same nonce");
-        bytes32 txHash3 = keccak256("another tx same nonce");
 
         // Propose multiple transactions with same nonce
         vm.prank(owner1);
-        registry.proposeTx(txHash1, safe, recipient, 1 ether, data, Enum.Operation.Call, nonce);
+        registry.proposeTx(txHash1, safe, recipient, 1 ether, "", Enum.Operation.Call, 0);
 
         vm.prank(owner2);
-        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, nonce);
+        registry.proposeTx(keccak256("additional tx same nonce"), safe, recipient, 2 ether, "", Enum.Operation.Call, 0);
 
         vm.prank(owner1);
-        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, nonce);
+        registry.proposeTx(keccak256("another tx same nonce"), safe, recipient, 3 ether, "", Enum.Operation.Call, 0);
 
         // Get transaction ID for the executed transaction
         (,,,,,,, uint256 txId1) = registry.getTxDetails(txHash1);
 
         // Expect BatchTransactionsRemovedFromPending event (3 transactions)
         vm.expectEmit(true, false, false, true);
-        emit BatchTransactionsRemovedFromPending(safe, nonce, 3, "nonce_consumed");
+        emit BatchTransactionsRemovedFromPending(safe, 0, 3, "nonce_consumed");
 
         // Expect TransactionExecuted event for the executed transaction
         vm.expectEmit(true, true, false, true);
@@ -579,39 +570,32 @@ contract SafeTxPoolGuardTest is Test {
 
         // Execute transaction through MockSafe (which triggers guard)
         mockSafe.execTransaction(
-            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+            recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), ""
         );
     }
 
     function testSafeExecutionWithMixedNoncesEventEmission() public {
-        bytes memory data = "";
-        bytes memory signatures = "";
-        uint256 executeNonce = 0; // Use nonce 0 to match MockSafe hash calculation
-        uint256 otherNonce = 1;
-
         // Create transaction hash that matches MockSafe calculation
         bytes32 executeTxHash = keccak256(
-            abi.encode(recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
+            abi.encode(recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), address(0), block.chainid)
         );
-        bytes32 txHash2 = keccak256("same nonce tx");
-        bytes32 txHash3 = keccak256("different nonce tx");
 
         // Propose transactions with mixed nonces
         vm.prank(owner1);
-        registry.proposeTx(executeTxHash, safe, recipient, 1 ether, data, Enum.Operation.Call, executeNonce);
+        registry.proposeTx(executeTxHash, safe, recipient, 1 ether, "", Enum.Operation.Call, 0);
 
         vm.prank(owner2);
-        registry.proposeTx(txHash2, safe, recipient, 2 ether, data, Enum.Operation.Call, executeNonce); // Same nonce
+        registry.proposeTx(keccak256("same nonce tx"), safe, recipient, 2 ether, "", Enum.Operation.Call, 0); // Same nonce
 
         vm.prank(owner1);
-        registry.proposeTx(txHash3, safe, recipient, 3 ether, data, Enum.Operation.Call, otherNonce); // Different nonce
+        registry.proposeTx(keccak256("different nonce tx"), safe, recipient, 3 ether, "", Enum.Operation.Call, 1); // Different nonce
 
         // Get transaction ID for the executed transaction
         (,,,,,,, uint256 executeId) = registry.getTxDetails(executeTxHash);
 
-        // Expect BatchTransactionsRemovedFromPending event (2 transactions with executeNonce)
+        // Expect BatchTransactionsRemovedFromPending event (2 transactions with nonce 0)
         vm.expectEmit(true, false, false, true);
-        emit BatchTransactionsRemovedFromPending(safe, executeNonce, 2, "nonce_consumed");
+        emit BatchTransactionsRemovedFromPending(safe, 0, 2, "nonce_consumed");
 
         // Expect TransactionExecuted event
         vm.expectEmit(true, true, false, true);
@@ -619,13 +603,13 @@ contract SafeTxPoolGuardTest is Test {
 
         // Execute transaction through MockSafe (which triggers guard)
         mockSafe.execTransaction(
-            recipient, 1 ether, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signatures
+            recipient, 1 ether, "", Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), ""
         );
 
         // Verify different nonce transaction still exists
         bytes32[] memory pending = registry.getPendingTxHashes(safe, 0, 10);
-        assertEq(pending.length, 1); // txHash3 should remain
-        assertEq(pending[0], txHash3);
+        assertEq(pending.length, 1); // Different nonce tx should remain
+        assertEq(pending[0], keccak256("different nonce tx"));
     }
 
     function testGuardMarkAsExecutedTryCatchSuccess() public {
