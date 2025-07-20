@@ -309,6 +309,11 @@ contract SafeTxPoolRegistry is BaseGuard {
     // Events for debugging guard execution
     event GuardAfterExecuted(bytes32 indexed txHash, address indexed safe, bool success);
 
+    // Events for error handling in checkAfterExecution
+    event TransactionNotInPool(bytes32 indexed txHash, address indexed safe);
+    event FailedTransactionSkipped(bytes32 indexed txHash, address indexed safe);
+    event MarkExecutionFailed(bytes32 indexed txHash, address indexed safe, bytes reason);
+
     /**
      * @notice Implementation of the Guard interface's checkAfterExecution function
      * @dev This function is called after a Safe transaction is executed
@@ -316,18 +321,34 @@ contract SafeTxPoolRegistry is BaseGuard {
      * @param success Whether the transaction was successful
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
+        address safe = msg.sender;
+
         // Always emit event at the beginning to track guard execution
-        emit GuardAfterExecuted(txHash, msg.sender, success);
+        emit GuardAfterExecuted(txHash, safe, success);
 
         // Only proceed if transaction was successful
-        if (!success) return;
+        if (!success) {
+            emit FailedTransactionSkipped(txHash, safe);
+            return;
+        }
 
         // Since the transaction hash is the same in the pool and in the Safe,
         // we can directly try to mark the transaction as executed
         try txPoolCore.markAsExecuted(txHash) {
             // Transaction was successfully marked as executed
-        } catch {
-            // Transaction might not exist in the pool, which is fine
+        } catch (bytes memory reason) {
+            // Emit detailed error information for debugging
+            emit MarkExecutionFailed(txHash, safe, reason);
+
+            // Check if this is specifically because transaction doesn't exist in pool
+            // This is the most common and expected case
+            if (reason.length >= 4) {
+                bytes4 errorSelector = bytes4(reason);
+                // TransactionNotFound() error selector is 0x31fb878f
+                if (errorSelector == 0x31fb878f) {
+                    emit TransactionNotInPool(txHash, safe);
+                }
+            }
         }
     }
 
