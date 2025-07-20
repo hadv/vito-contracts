@@ -75,6 +75,11 @@ contract SafeTxPoolGuardTest is Test {
     event TransactionRemovedFromPending(bytes32 indexed txHash, address indexed safe, uint256 txId, string reason);
     event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
 
+    // New events for error handling in checkAfterExecution
+    event TransactionNotInPool(bytes32 indexed txHash, address indexed safe);
+    event FailedTransactionSkipped(bytes32 indexed txHash, address indexed safe);
+    event MarkExecutionFailed(bytes32 indexed txHash, address indexed safe, bytes reason);
+
     function setUp() public {
         // Deploy components with new pattern
         txPoolCore = new SafeTxPoolCore();
@@ -922,5 +927,60 @@ contract SafeTxPoolGuardTest is Test {
         // Second execution of same transaction should not revert due to try-catch
         vm.prank(safe);
         registry.checkAfterExecution(txHash, true); // Should not revert
+    }
+
+    function testGuardFailedTransactionSkippedEvent() public {
+        bytes32 txHash = keccak256("failed transaction test");
+
+        // Expect FailedTransactionSkipped event to be emitted
+        vm.expectEmit(true, true, false, true);
+        emit FailedTransactionSkipped(txHash, safe);
+
+        // Call checkAfterExecution with success = false
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, false);
+    }
+
+    function testGuardTransactionNotInPoolEvent() public {
+        bytes32 nonExistentTxHash = keccak256("non existent transaction");
+
+        // Expect MarkExecutionFailed event to be emitted first (with TransactionNotFound error)
+        vm.expectEmit(true, true, false, false); // Don't check data field due to complexity
+        emit MarkExecutionFailed(nonExistentTxHash, safe, "");
+
+        // Expect TransactionNotInPool event to be emitted second
+        vm.expectEmit(true, true, false, true);
+        emit TransactionNotInPool(nonExistentTxHash, safe);
+
+        // Call checkAfterExecution with non-existent transaction
+        vm.prank(safe);
+        registry.checkAfterExecution(nonExistentTxHash, true);
+    }
+
+    function testGuardMarkExecutionFailedEvent() public {
+        bytes32 txHash = keccak256("mark execution failed test");
+        bytes memory data = "";
+
+        // Propose transaction
+        vm.prank(owner1);
+        registry.proposeTx(txHash, safe, recipient, 1 ether, data, Enum.Operation.Call, 0);
+
+        // First execution should succeed and emit TransactionExecuted
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
+
+        // Verify transaction was removed
+        (address txSafe,,,,,,,) = registry.getTxDetails(txHash);
+        assertEq(txSafe, address(0));
+
+        // Second execution should emit error events in correct order
+        vm.expectEmit(true, true, false, false); // Don't check data field
+        emit MarkExecutionFailed(txHash, safe, "");
+
+        vm.expectEmit(true, true, false, true);
+        emit TransactionNotInPool(txHash, safe);
+
+        vm.prank(safe);
+        registry.checkAfterExecution(txHash, true);
     }
 }
