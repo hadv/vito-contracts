@@ -307,7 +307,7 @@ contract SafeTxPoolRegistry is BaseGuard {
     }
 
     // Events for debugging guard execution
-    event GuardNotSuccess(bytes32 indexed txHash, address indexed safe);
+    event GuardAfterExecuted(bytes32 indexed txHash, address indexed safe, bool success);
 
     /**
      * @notice Implementation of the Guard interface's checkAfterExecution function
@@ -316,11 +316,11 @@ contract SafeTxPoolRegistry is BaseGuard {
      * @param success Whether the transaction was successful
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
+        // Always emit event at the beginning to track guard execution
+        emit GuardAfterExecuted(txHash, msg.sender, success);
+
         // Only proceed if transaction was successful
-        if (!success) {
-            emit GuardNotSuccess(txHash, msg.sender);
-            return;
-        }
+        if (!success) return;
 
         // Since the transaction hash is the same in the pool and in the Safe,
         // we can directly try to mark the transaction as executed
