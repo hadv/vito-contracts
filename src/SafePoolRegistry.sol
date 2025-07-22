@@ -165,8 +165,6 @@ contract SafePoolRegistry is BaseGuard {
         return txPoolCore.hasSignedTx(txHash, signer);
     }
 
-
-
     /**
      * @notice Get a range of pending transaction hashes for a Safe
      */
@@ -244,7 +242,11 @@ contract SafePoolRegistry is BaseGuard {
     /**
      * @notice Get all address book entries for a Safe
      */
-    function getAddressBookEntries(address safe) external view returns (IAddressBookManager.AddressBookEntry[] memory) {
+    function getAddressBookEntries(address safe)
+        external
+        view
+        returns (IAddressBookManager.AddressBookEntry[] memory)
+    {
         return addressBookManager.getAddressBookEntries(safe);
     }
 
@@ -281,7 +283,11 @@ contract SafePoolRegistry is BaseGuard {
     /**
      * @notice Get all trusted contracts for a Safe
      */
-    function getTrustedContracts(address safe) external view returns (ITrustedContractManager.TrustedContractEntry[] memory) {
+    function getTrustedContracts(address safe)
+        external
+        view
+        returns (ITrustedContractManager.TrustedContractEntry[] memory)
+    {
         return trustedContractManager.getTrustedContracts(safe);
     }
 
