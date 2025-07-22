@@ -694,25 +694,26 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
     }
 
     /**
-     * @notice Reconstruct the Safe message hash for EIP-1271 signing
+     * @notice Reconstruct the Safe message hash for EIP-1271 signing (compliant with Safe wallet format)
      * @param safeMessage The Safe message data
      * @return The Safe message hash that should be signed
      */
     function _getSafeMessageHash(SafeMessage storage safeMessage) internal view returns (bytes32) {
         // Safe message type hash: keccak256("SafeMessage(bytes message)")
+        // Correct type hash: 0x60b3cbf8b4a223d68d641b3b6ddf9a298e7f33710cf3d3a9d1146b5a6150fbca
         bytes32 SAFE_MSG_TYPEHASH = 0x60b3cbf8b4a223d68d641b3b6ddf9a298e7f33710cf3d3a9d1146b5a6150fbca;
 
-        // EIP-712 domain separator for the Safe
+        // EIP-712 domain separator for the Safe (using Safe's domain format)
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safeMessage.safe
             )
         );
 
-        // Safe message struct hash
+        // Safe message struct hash (using Safe's format)
         bytes32 safeMessageStructHash = keccak256(abi.encode(SAFE_MSG_TYPEHASH, keccak256(safeMessage.message)));
 
-        // Final Safe message hash (EIP-712 format)
+        // Final Safe message hash (EIP-712 format compatible with Safe wallet)
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, safeMessageStructHash));
     }
 }

@@ -26,6 +26,10 @@ interface ISafeTxPoolCore {
     }
 
     // Struct to hold message signing details
+    // Uses Safe wallet compliant EIP-712 message hash format:
+    // - Type hash: keccak256("SafeMessage(bytes message)") = 0x60b3cbf8b4a223d68d641b3b6ddf9a298e7f33710cf3d3a9d1146b5a6150fbca
+    // - Domain separator: EIP712Domain(uint256 chainId,address verifyingContract)
+    // - Final hash: keccak256("\x19\x01" + domainSeparator + structHash)
     struct SafeMessage {
         address safe;
         bytes message;
