@@ -43,6 +43,7 @@ contract TrustedContractManagerTest is Test {
 
         // Set registry addresses for all components (one-time only)
         txPoolCore.setRegistry(address(registry));
+        messagePool.setRegistry(address(registry));
         addressBookManager.setRegistry(address(registry));
         delegateCallManager.setRegistry(address(registry));
         trustedContractManager.setRegistry(address(registry));

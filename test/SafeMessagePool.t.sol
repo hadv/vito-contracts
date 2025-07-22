@@ -51,6 +51,9 @@ contract SafeMessagePoolTest is Test {
             address(transactionValidator)
         );
 
+        // Set registry in message pool (done during deployment)
+        messagePool.setRegistry(address(registry));
+
         // Generate message hash (simplified for testing)
         messageHash = keccak256(abi.encodePacked(testMessage, safe, block.chainid));
     }

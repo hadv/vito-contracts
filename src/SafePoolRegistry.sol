@@ -61,9 +61,6 @@ contract SafePoolRegistry is BaseGuard {
         delegateCallManager = IDelegateCallManager(_delegateCallManager);
         trustedContractManager = ITrustedContractManager(_trustedContractManager);
         transactionValidator = ITransactionValidator(_transactionValidator);
-
-        // Set this registry in the message pool
-        messagePool.setRegistry(address(this));
     }
 
     // ============ Transaction Pool Functions ============
