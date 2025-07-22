@@ -417,11 +417,18 @@ contract SafePoolRegistry is BaseGuard {
 
     /**
      * @notice Called by the Safe after a transaction is executed
-     * @dev We don't need to implement any post-transaction checks for the registry
+     * @dev Automatically marks the transaction as executed if it was successful
      */
-    function checkAfterExecution(bytes32 txHash, bool success) external view override {
-        // No post-transaction checks needed for the registry
-        // This is just to satisfy the BaseGuard interface
+    function checkAfterExecution(bytes32 txHash, bool success) external override {
+        // Only mark as executed if the transaction was successful
+        if (success) {
+            // Use try-catch to handle cases where the transaction might not exist in the pool
+            try this.markAsExecuted(txHash) {
+                // Transaction successfully marked as executed
+            } catch {
+                // Transaction might not exist in pool or already executed - ignore
+            }
+        }
     }
 
     /**
