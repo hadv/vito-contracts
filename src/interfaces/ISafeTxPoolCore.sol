@@ -25,6 +25,22 @@ interface ISafeTxPoolCore {
         uint256 txId;
     }
 
+    // Struct to hold message signing details
+    struct SafeMessage {
+        address safe;
+        bytes message;
+        bytes32 messageHash;
+        // Additional fields for proposal management
+        address proposer;
+        // Signature management
+        bytes[] signatures;
+        // Message ID to distinguish between reused message hashes
+        uint256 msgId;
+        // dApp session info for WalletConnect responses
+        string dAppTopic;
+        uint256 dAppRequestId;
+    }
+
     // Events
     event TransactionProposed(
         bytes32 indexed txHash,
@@ -48,9 +64,27 @@ interface ISafeTxPoolCore {
 
     event BatchTransactionsRemovedFromPending(address indexed safe, uint256 nonce, uint256 count, string reason);
 
+    // Message signing events
+    event MessageProposed(
+        bytes32 indexed messageHash,
+        address indexed proposer,
+        address indexed safe,
+        bytes message,
+        uint256 msgId,
+        string dAppTopic,
+        uint256 dAppRequestId
+    );
+
+    event MessageSigned(bytes32 indexed messageHash, address indexed signer, bytes signature, uint256 msgId);
+
+    event MessageExecuted(bytes32 indexed messageHash, address indexed safe, uint256 msgId);
+
+    event MessageDeleted(bytes32 indexed messageHash, address indexed safe, address indexed proposer, uint256 msgId);
+
     // Errors
     error AlreadySigned();
     error TransactionNotFound();
+    error MessageNotFound();
     error NotSafeWallet();
     error NotProposer();
 
@@ -156,4 +190,92 @@ interface ISafeTxPoolCore {
      * @return Array of pending transaction hashes
      */
     function getPendingTxHashes(address safe, uint256 offset, uint256 limit) external view returns (bytes32[] memory);
+
+    // ============ Message Pool Functions ============
+
+    /**
+     * @notice Propose a new Safe message for signing
+     * @param messageHash Hash of the Safe message
+     * @param safe The Safe wallet address
+     * @param message The message to be signed
+     * @param dAppTopic WalletConnect topic for dApp response
+     * @param dAppRequestId WalletConnect request ID for dApp response
+     */
+    function proposeMessage(
+        bytes32 messageHash,
+        address safe,
+        bytes calldata message,
+        string calldata dAppTopic,
+        uint256 dAppRequestId
+    ) external;
+
+    /**
+     * @notice Sign a proposed message
+     * @param messageHash Hash of the Safe message to sign
+     * @param signature Owner's signature of the message
+     */
+    function signMessage(bytes32 messageHash, bytes calldata signature) external;
+
+    /**
+     * @notice Mark a message as executed and remove from storage
+     * @param messageHash Hash of the Safe message
+     */
+    function markMessageAsExecuted(bytes32 messageHash) external;
+
+    /**
+     * @notice Delete a pending message
+     * @param messageHash Hash of the Safe message to delete
+     */
+    function deleteMessage(bytes32 messageHash) external;
+
+    /**
+     * @notice Get message details by hash
+     * @param messageHash Hash of the Safe message
+     * @return safe The Safe wallet address
+     * @return message The message data
+     * @return proposer Address of proposer
+     * @return msgId Message ID
+     * @return dAppTopic WalletConnect topic
+     * @return dAppRequestId WalletConnect request ID
+     */
+    function getMessageDetails(bytes32 messageHash)
+        external
+        view
+        returns (
+            address safe,
+            bytes memory message,
+            address proposer,
+            uint256 msgId,
+            string memory dAppTopic,
+            uint256 dAppRequestId
+        );
+
+    /**
+     * @notice Get pending messages for a Safe
+     * @param safe The Safe wallet address
+     * @return Array of pending message hashes
+     */
+    function getPendingMessages(address safe) external view returns (bytes32[] memory);
+
+    /**
+     * @notice Get signatures for a message
+     * @param messageHash Hash of the Safe message
+     * @return Array of signatures
+     */
+    function getMessageSignatures(bytes32 messageHash) external view returns (bytes[] memory);
+
+    /**
+     * @notice Get signature count for a message
+     * @param messageHash Hash of the Safe message
+     * @return Number of signatures collected
+     */
+    function getMessageSignatureCount(bytes32 messageHash) external view returns (uint256);
+
+    /**
+     * @notice Check if an address has signed a message
+     * @param messageHash Hash of the Safe message
+     * @param signer Address to check
+     * @return True if the address has signed
+     */
+    function hasSignedMessage(bytes32 messageHash, address signer) external view returns (bool);
 }

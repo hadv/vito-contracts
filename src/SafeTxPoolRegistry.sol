@@ -352,6 +352,94 @@ contract SafeTxPoolRegistry is BaseGuard {
         }
     }
 
+    // ============ Message Pool Functions ============
+
+    /**
+     * @notice Propose a new Safe message for signing
+     */
+    function proposeMessage(
+        bytes32 messageHash,
+        address safe,
+        bytes calldata message,
+        string calldata dAppTopic,
+        uint256 dAppRequestId
+    ) external {
+        txPoolCore.proposeMessageWithProposer(messageHash, safe, message, dAppTopic, dAppRequestId, msg.sender);
+    }
+
+    /**
+     * @notice Sign a proposed message
+     */
+    function signMessage(bytes32 messageHash, bytes calldata signature) external {
+        txPoolCore.signMessage(messageHash, signature);
+    }
+
+    /**
+     * @notice Mark a message as executed and remove from storage
+     */
+    function markMessageAsExecuted(bytes32 messageHash) external {
+        txPoolCore.markMessageAsExecuted(messageHash);
+    }
+
+    /**
+     * @notice Delete a pending message
+     */
+    function deleteMessage(bytes32 messageHash) external {
+        // Get message details to check if caller is the proposer
+        (,, address proposer,,,) = txPoolCore.getMessageDetails(messageHash);
+
+        // Check if caller is the proposer
+        if (msg.sender != proposer) revert NotProposer();
+
+        txPoolCore.deleteMessage(messageHash);
+    }
+
+    /**
+     * @notice Get message details by hash
+     */
+    function getMessageDetails(bytes32 messageHash)
+        external
+        view
+        returns (
+            address safe,
+            bytes memory message,
+            address proposer,
+            uint256 msgId,
+            string memory dAppTopic,
+            uint256 dAppRequestId
+        )
+    {
+        return txPoolCore.getMessageDetails(messageHash);
+    }
+
+    /**
+     * @notice Get pending messages for a Safe
+     */
+    function getPendingMessages(address safe) external view returns (bytes32[] memory) {
+        return txPoolCore.getPendingMessages(safe);
+    }
+
+    /**
+     * @notice Get signatures for a message
+     */
+    function getMessageSignatures(bytes32 messageHash) external view returns (bytes[] memory) {
+        return txPoolCore.getMessageSignatures(messageHash);
+    }
+
+    /**
+     * @notice Get signature count for a message
+     */
+    function getMessageSignatureCount(bytes32 messageHash) external view returns (uint256) {
+        return txPoolCore.getMessageSignatureCount(messageHash);
+    }
+
+    /**
+     * @notice Check if an address has signed a message
+     */
+    function hasSignedMessage(bytes32 messageHash, address signer) external view returns (bool) {
+        return txPoolCore.hasSignedMessage(messageHash, signer);
+    }
+
     /**
      * @notice This function is called by the Safe contract when a function is not found
      * @dev It prevents the Safe from being locked during upgrades
