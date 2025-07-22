@@ -496,7 +496,9 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         if (safeMessage.proposer == address(0)) revert MessageNotFound();
 
         // Check if caller is the Safe wallet, this contract, or the registry
-        if (msg.sender != safeMessage.safe && msg.sender != address(this) && msg.sender != registry) revert NotSafeWallet();
+        if (msg.sender != safeMessage.safe && msg.sender != address(this) && msg.sender != registry) {
+            revert NotSafeWallet();
+        }
 
         uint256 msgId = safeMessage.msgId;
         address safe = safeMessage.safe;
@@ -521,7 +523,10 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         if (safeMessage.proposer == address(0)) revert MessageNotFound();
 
         // Check if caller is the proposer, the Safe wallet, this contract, or the registry
-        if (msg.sender != safeMessage.proposer && msg.sender != safeMessage.safe && msg.sender != address(this) && msg.sender != registry) revert NotProposer();
+        if (
+            msg.sender != safeMessage.proposer && msg.sender != safeMessage.safe && msg.sender != address(this)
+                && msg.sender != registry
+        ) revert NotProposer();
 
         uint256 msgId = safeMessage.msgId;
         address safe = safeMessage.safe;
@@ -664,9 +669,7 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         // EIP-712 domain separator for the Safe
         bytes32 domainSeparator = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
-                block.chainid,
-                safeMessage.safe
+                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), block.chainid, safeMessage.safe
             )
         );
 
