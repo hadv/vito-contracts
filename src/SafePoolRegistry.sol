@@ -318,8 +318,6 @@ contract SafePoolRegistry is BaseGuard {
         messagePool.signMessage(messageHash, signature);
     }
 
-
-
     /**
      * @notice Delete a pending message
      */

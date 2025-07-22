@@ -130,8 +130,6 @@ contract SafeMessagePool is ISafeMessagePool {
         emit MessageSigned(messageHash, signer, signature, msgId);
     }
 
-
-
     /**
      * @notice Delete a pending message
      * @param messageHash Hash of the Safe message to delete

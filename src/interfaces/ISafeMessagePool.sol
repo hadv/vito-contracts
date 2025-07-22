@@ -40,8 +40,6 @@ interface ISafeMessagePool {
 
     event MessageSigned(bytes32 indexed messageHash, address indexed signer, bytes signature, uint256 msgId);
 
-
-
     event MessageDeleted(bytes32 indexed messageHash, address indexed safe, address indexed proposer, uint256 msgId);
 
     // Errors
@@ -86,8 +84,6 @@ interface ISafeMessagePool {
      * @param signature Owner's signature of the message
      */
     function signMessage(bytes32 messageHash, bytes calldata signature) external;
-
-
 
     /**
      * @notice Delete a pending message

@@ -128,8 +128,6 @@ contract SafeMessagePoolTest is Test {
         // There's no "execution" concept for messages - they're just signed
     }
 
-
-
     function testDeleteMessage() public {
         // Propose a message
         vm.prank(proposer);
