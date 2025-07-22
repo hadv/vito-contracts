@@ -7,7 +7,7 @@ import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
 import "../src/TrustedContractManager.sol";
 import "../src/TransactionValidator.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafePoolRegistry.sol";
 import "../src/interfaces/IBaseManager.sol";
 import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
@@ -17,7 +17,7 @@ contract SafeTxPoolTest is Test {
     DelegateCallManager public delegateCallManager;
     TrustedContractManager public trustedContractManager;
     TransactionValidator public transactionValidator;
-    SafeTxPoolRegistry public registry;
+    SafePoolRegistry public registry;
 
     address public safe = address(0x1234);
     address public owner1 = address(0x5678);
@@ -35,7 +35,7 @@ contract SafeTxPoolTest is Test {
         transactionValidator = new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
         // Deploy registry with all components
-        registry = new SafeTxPoolRegistry(
+        registry = new SafePoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
             address(delegateCallManager),
@@ -67,7 +67,7 @@ contract SafeTxPoolTest is Test {
         console.log("DelegateCallManager:    ", delegateCallSize);
         console.log("TrustedContractManager: ", trustedContractSize);
         console.log("TransactionValidator:   ", validatorSize);
-        console.log("SafeTxPoolRegistry:     ", registrySize);
+        console.log("SafePoolRegistry:     ", registrySize);
 
         // All contracts should be well under the 24KB limit
         assertLt(txPoolCoreSize, 24576, "SafeTxPoolCore too large");
@@ -75,7 +75,7 @@ contract SafeTxPoolTest is Test {
         assertLt(delegateCallSize, 24576, "DelegateCallManager too large");
         assertLt(trustedContractSize, 24576, "TrustedContractManager too large");
         assertLt(validatorSize, 24576, "TransactionValidator too large");
-        assertLt(registrySize, 24576, "SafeTxPoolRegistry too large");
+        assertLt(registrySize, 24576, "SafePoolRegistry too large");
     }
 
     function testAccessControlPreventsDirectCalls() public {

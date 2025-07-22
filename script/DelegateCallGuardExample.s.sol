@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafePoolRegistry.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
@@ -13,10 +13,10 @@ import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 /**
  * @title DelegateCallGuardExample
- * @dev Example script demonstrating how to use the SafeTxPoolRegistry delegate call guard functionality
+ * @dev Example script demonstrating how to use the SafePoolRegistry delegate call guard functionality
  */
 contract DelegateCallGuardExample is Script {
-    SafeTxPoolRegistry public pool;
+    SafePoolRegistry public pool;
     address public safe;
     address public targetContract;
 
@@ -37,8 +37,8 @@ contract DelegateCallGuardExample is Script {
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
-        // Deploy the SafeTxPoolRegistry
-        pool = new SafeTxPoolRegistry(
+        // Deploy the SafePoolRegistry
+        pool = new SafePoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
             address(delegateCallManager),
@@ -73,7 +73,7 @@ contract DelegateCallGuardExample is Script {
 
         // Example 4: Add target to address book (required for the guard to allow transactions)
         console.log("\n=== Adding to Address Book ===");
-        pool.addAddressBookEntry(safe, targetContract, "Example Target Contract");
+        pool.addAddressBookEntry(safe, targetContract, bytes32(bytes("Example Target Contract")));
 
         // Get address book entries to verify
         IAddressBookManager.AddressBookEntry[] memory entries = pool.getAddressBookEntries(safe);
@@ -98,7 +98,7 @@ contract DelegateCallGuardExample is Script {
         console.log("Unauthorized target:", unauthorizedTarget);
 
         // Add to address book first
-        pool.addAddressBookEntry(safe, unauthorizedTarget, "Unauthorized Target");
+        pool.addAddressBookEntry(safe, unauthorizedTarget, bytes32(bytes("Unauthorized Target")));
 
         try pool.checkTransaction(
             unauthorizedTarget, 0, "", Enum.Operation.DelegateCall, 0, 0, 0, address(0), payable(address(0)), "", safe

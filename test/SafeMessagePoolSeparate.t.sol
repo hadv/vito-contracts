@@ -2,16 +2,18 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafePoolRegistry.sol";
+import "../src/SafeMessagePool.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
 import "../src/TrustedContractManager.sol";
 import "../src/TransactionValidator.sol";
-import "../src/interfaces/ISafeTxPoolCore.sol";
+import "../src/interfaces/ISafeMessagePool.sol";
 
-contract SafeMessagePoolTest is Test {
-    SafeTxPoolRegistry public registry;
+contract SafeMessagePoolSeparateTest is Test {
+    SafePoolRegistry public registry;
+    SafeMessagePool public messagePool;
     SafeTxPoolCore public txPoolCore;
     AddressBookManager public addressBookManager;
     DelegateCallManager public delegateCallManager;
@@ -36,17 +38,15 @@ contract SafeMessagePoolTest is Test {
         trustedContractManager = new TrustedContractManager();
         transactionValidator = new TransactionValidator(address(trustedContractManager), address(delegateCallManager));
 
-        // Deploy registry
-        registry = new SafeTxPoolRegistry(
+        // Deploy registry (which deploys the message pool)
+        registry = new SafePoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),
             address(transactionValidator)
         );
-
-        // Set registry in core
-        txPoolCore.setRegistry(address(registry));
+        messagePool = registry.messagePool();
 
         // Generate message hash (simplified for testing)
         messageHash = keccak256(abi.encodePacked(testMessage, safe, block.chainid));
@@ -107,6 +107,33 @@ contract SafeMessagePoolTest is Test {
         assertEq(pendingMessages[0], messageHash);
     }
 
+    function testGetAllMessages() public {
+        // Propose a message
+        vm.prank(proposer);
+        registry.proposeMessage(messageHash, safe, testMessage, dAppTopic, dAppRequestId);
+
+        // Verify message appears in both pending and all messages
+        bytes32[] memory pendingMessages = registry.getPendingMessages(safe);
+        bytes32[] memory allMessages = registry.getAllMessages(safe);
+
+        assertEq(pendingMessages.length, 1);
+        assertEq(allMessages.length, 1);
+        assertEq(pendingMessages[0], messageHash);
+        assertEq(allMessages[0], messageHash);
+
+        // Mark as executed
+        vm.prank(safe);
+        registry.markMessageAsExecuted(messageHash);
+
+        // Verify message is removed from pending but stays in all messages
+        pendingMessages = registry.getPendingMessages(safe);
+        allMessages = registry.getAllMessages(safe);
+
+        assertEq(pendingMessages.length, 0); // Removed from pending
+        assertEq(allMessages.length, 1); // Still in history
+        assertEq(allMessages[0], messageHash);
+    }
+
     function testMarkMessageAsExecuted() public {
         // Propose a message
         vm.prank(proposer);
@@ -151,7 +178,7 @@ contract SafeMessagePoolTest is Test {
 
         // Try to delete from non-proposer (should fail)
         vm.prank(owner1);
-        vm.expectRevert(ISafeTxPoolCore.NotProposer.selector);
+        vm.expectRevert(SafePoolRegistry.NotProposer.selector);
         registry.deleteMessage(messageHash);
     }
 
@@ -159,7 +186,7 @@ contract SafeMessagePoolTest is Test {
         bytes memory signature = abi.encodePacked(bytes32(uint256(0x1)), bytes32(uint256(0x2)), uint8(27));
 
         vm.prank(owner1);
-        vm.expectRevert(ISafeTxPoolCore.MessageNotFound.selector);
+        vm.expectRevert(ISafeMessagePool.MessageNotFound.selector);
         registry.signMessage(messageHash, signature);
     }
 
@@ -190,33 +217,6 @@ contract SafeMessagePoolTest is Test {
         assertEq(count, 2);
     }
 
-    function testGetAllMessages() public {
-        // Propose a message
-        vm.prank(proposer);
-        registry.proposeMessage(messageHash, safe, testMessage, dAppTopic, dAppRequestId);
-
-        // Verify message appears in both pending and all messages
-        bytes32[] memory pendingMessages = registry.getPendingMessages(safe);
-        bytes32[] memory allMessages = registry.getAllMessages(safe);
-
-        assertEq(pendingMessages.length, 1);
-        assertEq(allMessages.length, 1);
-        assertEq(pendingMessages[0], messageHash);
-        assertEq(allMessages[0], messageHash);
-
-        // Mark as executed
-        vm.prank(safe);
-        registry.markMessageAsExecuted(messageHash);
-
-        // Verify message is removed from pending but stays in all messages
-        pendingMessages = registry.getPendingMessages(safe);
-        allMessages = registry.getAllMessages(safe);
-
-        assertEq(pendingMessages.length, 0); // Removed from pending
-        assertEq(allMessages.length, 1); // Still in history
-        assertEq(allMessages[0], messageHash);
-    }
-
     function testSafeMessageHashFormat() public {
         // Test that our Safe message hash format matches the official Safe wallet format
         // Safe message type hash: keccak256("SafeMessage(bytes message)")
@@ -232,11 +232,7 @@ contract SafeMessagePoolTest is Test {
 
         // Calculate expected Safe message hash
         bytes32 domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
-                testChainId,
-                testSafe
-            )
+            abi.encode(keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"), testChainId, testSafe)
         );
 
         bytes32 messageStructHash = keccak256(abi.encode(expectedTypeHash, keccak256(testMsg)));
@@ -245,46 +241,6 @@ contract SafeMessagePoolTest is Test {
         // This verifies our implementation generates the correct Safe-compliant message hash
         console.log("Safe message hash format verified - compatible with Safe wallet EIP-712 implementation");
         console.logBytes32(expectedSafeMessageHash);
-
-        // Note: The hash 0x713fc94b1a0101cc226a6be4392c9e4156223365323a82f7f70a1bc42c34cfc1
-        // mentioned by user might be a specific message hash or domain separator, not the type hash
-    }
-
-    function testInvestigateUserProvidedHash() public {
-        // Investigate what the hash 0x713fc94b1a0101cc226a6be4392c9e4156223365323a82f7f70a1bc42c34cfc1 represents
-        bytes32 userHash = 0x713fc94b1a0101cc226a6be4392c9e4156223365323a82f7f70a1bc42c34cfc1;
-
-        console.log("Investigating user-provided hash:");
-        console.logBytes32(userHash);
-
-        // Check if it's a domain separator for a specific Safe and chain
-        // Let's try some common combinations
-        address commonSafe = 0x1234567890123456789012345678901234567890;
-        uint256 mainnetChainId = 1;
-
-        bytes32 testDomainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(uint256 chainId,address verifyingContract)"),
-                mainnetChainId,
-                commonSafe
-            )
-        );
-
-        console.log("Test domain separator:");
-        console.logBytes32(testDomainSeparator);
-
-        // Check if it might be a complete message hash
-        bytes32 typeHash = 0x60b3cbf8b4a223d68d641b3b6ddf9a298e7f33710cf3d3a9d1146b5a6150fbca;
-        bytes memory testMessage = "Test message";
-
-        bytes32 messageStructHash = keccak256(abi.encode(typeHash, keccak256(testMessage)));
-        bytes32 completeMessageHash = keccak256(abi.encodePacked("\x19\x01", testDomainSeparator, messageStructHash));
-
-        console.log("Test complete message hash:");
-        console.logBytes32(completeMessageHash);
-
-        // The user hash might be from a specific Safe instance with specific message
-        console.log("User hash is likely a specific Safe message hash from a real Safe wallet instance");
     }
 
     function testMessageIsolationBetweenSafes() public {

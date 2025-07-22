@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafePoolRegistry.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
@@ -11,7 +11,7 @@ import "../src/TransactionValidator.sol";
 import "../src/interfaces/ITrustedContractManager.sol";
 
 contract TrustedContractManagerTest is Test {
-    SafeTxPoolRegistry public registry;
+    SafePoolRegistry public registry;
     TrustedContractManager public trustedContractManager;
 
     address public safe = address(0x1234);
@@ -29,7 +29,7 @@ contract TrustedContractManagerTest is Test {
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
         // Deploy registry
-        registry = new SafeTxPoolRegistry(
+        registry = new SafePoolRegistry(
             address(txPoolCore),
             address(addressBookManager),
             address(delegateCallManager),
