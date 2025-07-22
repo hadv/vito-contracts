@@ -11,7 +11,7 @@ import "../src/TrustedContractManager.sol";
 import "../src/TransactionValidator.sol";
 import "../src/interfaces/ISafeMessagePool.sol";
 
-contract SafeMessagePoolSeparateTest is Test {
+contract SafeMessagePoolTest is Test {
     SafePoolRegistry public registry;
     SafeMessagePool public messagePool;
     SafeTxPoolCore public txPoolCore;
