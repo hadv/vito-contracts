@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
+import "../src/SafeMessagePool.sol";
 import "../src/SafePoolRegistry.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
@@ -37,8 +38,11 @@ contract SafeTxPoolCoreTest is Test {
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
+        SafeMessagePool messagePool = new SafeMessagePool();
+
         registry = new SafePoolRegistry(
             address(txPoolCore),
+            address(messagePool),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),

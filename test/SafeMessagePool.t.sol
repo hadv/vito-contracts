@@ -38,15 +38,18 @@ contract SafeMessagePoolTest is Test {
         trustedContractManager = new TrustedContractManager();
         transactionValidator = new TransactionValidator(address(trustedContractManager), address(delegateCallManager));
 
-        // Deploy registry (which deploys the message pool)
+        // Deploy message pool first
+        messagePool = new SafeMessagePool();
+
+        // Deploy registry with all components including message pool
         registry = new SafePoolRegistry(
             address(txPoolCore),
+            address(messagePool),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),
             address(transactionValidator)
         );
-        messagePool = registry.messagePool();
 
         // Generate message hash (simplified for testing)
         messageHash = keccak256(abi.encodePacked(testMessage, safe, block.chainid));

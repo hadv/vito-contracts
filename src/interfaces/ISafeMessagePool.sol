@@ -69,6 +69,18 @@ interface ISafeMessagePool {
     ) external;
 
     /**
+     * @notice Propose a new Safe message for signing with explicit proposer (only callable by registry)
+     */
+    function proposeMessageWithProposer(
+        bytes32 messageHash,
+        address safe,
+        bytes calldata message,
+        string calldata dAppTopic,
+        uint256 dAppRequestId,
+        address proposer
+    ) external;
+
+    /**
      * @notice Sign a proposed message
      * @param messageHash Hash of the Safe message to sign
      * @param signature Owner's signature of the message
@@ -146,4 +158,9 @@ interface ISafeMessagePool {
      * @return True if the address has signed
      */
     function hasSignedMessage(bytes32 messageHash, address signer) external view returns (bool);
+
+    /**
+     * @notice Set the registry address (only callable once)
+     */
+    function setRegistry(address _registry) external;
 }

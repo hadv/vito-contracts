@@ -28,7 +28,7 @@ contract SafeMessagePool is ISafeMessagePool {
     mapping(address => bytes32[]) private allMessagesBySafe;
 
     /**
-     * @notice Set the registry address (only callable once by deployer)
+     * @notice Set the registry address (only callable once)
      */
     function setRegistry(address _registry) external {
         require(registry == address(0), "Registry already set");

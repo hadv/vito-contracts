@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 import "../src/SafeTxPoolCore.sol";
+import "../src/SafeMessagePool.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
 import "../src/TrustedContractManager.sol";
@@ -42,9 +43,14 @@ contract DeploySafeTxPool is Script {
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
         console.log("   TransactionValidator deployed at:", address(transactionValidator));
 
-        console.log("6. Deploying SafePoolRegistry...");
+        console.log("6. Deploying SafeMessagePool...");
+        SafeMessagePool messagePool = new SafeMessagePool();
+        console.log("   SafeMessagePool deployed at:", address(messagePool));
+
+        console.log("7. Deploying SafePoolRegistry...");
         SafePoolRegistry registry = new SafePoolRegistry(
             address(txPoolCore),
+            address(messagePool),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),
@@ -53,7 +59,7 @@ contract DeploySafeTxPool is Script {
         console.log("   SafePoolRegistry deployed at:", address(registry));
 
         // Set registry addresses for all components (one-time only)
-        console.log("7. Setting component registry addresses...");
+        console.log("8. Setting component registry addresses...");
         txPoolCore.setRegistry(address(registry));
         console.log("   SafeTxPoolCore registry set");
 

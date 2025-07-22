@@ -9,6 +9,7 @@ import "./interfaces/IAddressBookManager.sol";
 import "./interfaces/IDelegateCallManager.sol";
 import "./interfaces/ITrustedContractManager.sol";
 import "./interfaces/ITransactionValidator.sol";
+import "./interfaces/ISafeMessagePool.sol";
 import "./SafeMessagePool.sol";
 
 /**
@@ -20,7 +21,7 @@ contract SafePoolRegistry is BaseGuard {
     error NotProposer();
 
     ISafeTxPoolCore public immutable txPoolCore;
-    SafeMessagePool public immutable messagePool;
+    ISafeMessagePool public immutable messagePool;
     IAddressBookManager public immutable addressBookManager;
     IDelegateCallManager public immutable delegateCallManager;
     ITrustedContractManager public immutable trustedContractManager;
@@ -45,20 +46,21 @@ contract SafePoolRegistry is BaseGuard {
 
     constructor(
         address _txPoolCore,
+        address _messagePool,
         address _addressBookManager,
         address _delegateCallManager,
         address _trustedContractManager,
         address _transactionValidator
     ) {
         txPoolCore = ISafeTxPoolCore(_txPoolCore);
+        messagePool = ISafeMessagePool(_messagePool);
         addressBookManager = IAddressBookManager(_addressBookManager);
         delegateCallManager = IDelegateCallManager(_delegateCallManager);
         trustedContractManager = ITrustedContractManager(_trustedContractManager);
         transactionValidator = ITransactionValidator(_transactionValidator);
 
-        // Deploy and configure message pool
-        messagePool = new SafeMessagePool();
-        messagePool.setRegistry(address(this));
+        // Set this registry in the message pool
+        SafeMessagePool(_messagePool).setRegistry(address(this));
     }
 
     // ============ Transaction Pool Functions ============
