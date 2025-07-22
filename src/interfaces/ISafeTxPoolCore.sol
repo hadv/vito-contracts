@@ -210,6 +210,18 @@ interface ISafeTxPoolCore {
     ) external;
 
     /**
+     * @notice Propose a new Safe message for signing with explicit proposer (only callable by registry)
+     */
+    function proposeMessageWithProposer(
+        bytes32 messageHash,
+        address safe,
+        bytes calldata message,
+        string calldata dAppTopic,
+        uint256 dAppRequestId,
+        address proposer
+    ) external;
+
+    /**
      * @notice Sign a proposed message
      * @param messageHash Hash of the Safe message to sign
      * @param signature Owner's signature of the message
