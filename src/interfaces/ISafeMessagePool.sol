@@ -123,7 +123,7 @@ interface ISafeMessagePool {
     function getPendingMessages(address safe) external view returns (bytes32[] memory);
 
     /**
-     * @notice Get all message hashes for a Safe (including executed ones for history)
+     * @notice Get all message hashes for a Safe (for history)
      * @param safe The Safe wallet address
      * @return Array of all message hashes
      */

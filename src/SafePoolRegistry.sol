@@ -34,6 +34,9 @@ contract SafePoolRegistry is BaseGuard {
     event TransactionNotInPool(bytes32 indexed txHash, address indexed safe);
     event MarkExecutionFailed(bytes32 indexed txHash, address indexed safe, bytes reason);
 
+    // Events for debugging guard execution
+    event GuardAfterExecuted(bytes32 indexed txHash, address indexed safe, bool success);
+
     // Errors
     error DelegateCallDisabled();
     error DelegateCallTargetNotAllowed();
@@ -60,7 +63,7 @@ contract SafePoolRegistry is BaseGuard {
         transactionValidator = ITransactionValidator(_transactionValidator);
 
         // Set this registry in the message pool
-        SafeMessagePool(_messagePool).setRegistry(address(this));
+        messagePool.setRegistry(address(this));
     }
 
     // ============ Transaction Pool Functions ============
@@ -357,7 +360,7 @@ contract SafePoolRegistry is BaseGuard {
     }
 
     /**
-     * @notice Get all messages for a Safe (including executed ones for history)
+     * @notice Get all messages for a Safe (for history)
      */
     function getAllMessages(address safe) external view returns (bytes32[] memory) {
         return messagePool.getAllMessages(safe);
@@ -395,35 +398,51 @@ contract SafePoolRegistry is BaseGuard {
         uint256 value,
         bytes memory data,
         Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures,
-        address msgSender
-    ) external view override {
+        uint256,
+        uint256,
+        uint256,
+        address,
+        address payable,
+        bytes memory,
+        address
+    ) external override {
         address safe = msg.sender;
 
-        // Allow self-calls and guard calls
-        if (to == safe || to == address(this)) {
+        // Always allow the Safe to call itself (needed for owner management, threshold changes, etc.)
+        if (to == safe) {
+            emit SelfCallAllowed(safe, to);
             return;
         }
 
-        // Check if address is in address book
-        if (!addressBookManager.hasAddressBookEntry(safe, to)) {
-            revert("Address not in address book");
+        // Always allow the Safe to call this guard contract (needed for address book management)
+        if (to == address(this)) {
+            emit GuardCallAllowed(safe, address(this));
+            return;
         }
 
         // Check delegate call restrictions
         if (operation == Enum.Operation.DelegateCall) {
+            // If delegate calls are not enabled for this Safe, revert
             if (!delegateCallManager.isDelegateCallEnabled(safe)) {
                 revert DelegateCallDisabled();
             }
-            if (!delegateCallManager.isDelegateCallTargetAllowed(safe, to)) {
-                revert DelegateCallTargetNotAllowed();
+
+            // If the target is trusted, we can skip the delegate call target restrictions
+            bool isTargetTrusted = trustedContractManager.isTrustedContract(safe, to);
+            if (!isTargetTrusted) {
+                // If delegate calls are enabled, check if there are any specific target restrictions
+                // If the target is not explicitly allowed and there are restrictions, revert
+                if (
+                    !delegateCallManager.isDelegateCallTargetAllowed(safe, to)
+                        && delegateCallManager.hasDelegateCallTargetRestrictions(safe)
+                ) {
+                    revert DelegateCallTargetNotAllowed();
+                }
             }
         }
+
+        // Validate the transaction using the transaction validator
+        transactionValidator.validateTransaction(safe, to, value, data, operation);
     }
 
     /**
@@ -431,6 +450,8 @@ contract SafePoolRegistry is BaseGuard {
      * @dev Automatically marks the transaction as executed if it was successful
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
+        emit GuardAfterExecuted(txHash, msg.sender, success);
+
         if (success) {
             // Use try-catch to handle cases where the transaction might not exist in the pool
             try this.markAsExecuted(txHash) {

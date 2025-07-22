@@ -197,7 +197,7 @@ contract SafeMessagePool is ISafeMessagePool {
     }
 
     /**
-     * @notice Get all message hashes for a Safe (including executed ones for history)
+     * @notice Get all message hashes for a Safe (for history)
      */
     function getAllMessages(address safe) external view returns (bytes32[] memory) {
         return allMessagesBySafe[safe];
