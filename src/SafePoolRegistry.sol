@@ -318,18 +318,7 @@ contract SafePoolRegistry is BaseGuard {
         messagePool.signMessage(messageHash, signature);
     }
 
-    /**
-     * @notice Mark a message as executed
-     */
-    function markMessageAsExecuted(bytes32 messageHash) external {
-        // Get message details to check if caller is the Safe wallet
-        (address safe,,,,,) = messagePool.getMessageDetails(messageHash);
 
-        // Check if caller is the Safe wallet
-        require(msg.sender == safe, "Only Safe wallet can mark as executed");
-
-        messagePool.markMessageAsExecuted(messageHash);
-    }
 
     /**
      * @notice Delete a pending message

@@ -130,32 +130,7 @@ contract SafeMessagePool is ISafeMessagePool {
         emit MessageSigned(messageHash, signer, signature, msgId);
     }
 
-    /**
-     * @notice Mark a message as executed (keep in storage for history)
-     * @param messageHash Hash of the Safe message
-     */
-    function markMessageAsExecuted(bytes32 messageHash) external {
-        SafeMessage storage safeMessage = messages[messageHash];
 
-        // Check if message exists
-        if (safeMessage.proposer == address(0)) revert MessageNotFound();
-
-        // Check if caller is the Safe wallet, this contract, or the registry
-        if (msg.sender != safeMessage.safe && msg.sender != address(this) && msg.sender != registry) {
-            revert NotSafeWallet();
-        }
-
-        uint256 msgId = safeMessage.msgId;
-        address safe = safeMessage.safe;
-
-        // Remove from pending messages for this Safe (but keep message data for history)
-        _removeMessageFromPending(safe, messageHash);
-
-        // NOTE: We do NOT delete message data - keep it for history/audit trail
-        // This is different from transactions which are removed after execution
-
-        emit MessageExecuted(messageHash, safe, msgId);
-    }
 
     /**
      * @notice Delete a pending message

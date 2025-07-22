@@ -40,7 +40,7 @@ interface ISafeMessagePool {
 
     event MessageSigned(bytes32 indexed messageHash, address indexed signer, bytes signature, uint256 msgId);
 
-    event MessageExecuted(bytes32 indexed messageHash, address indexed safe, uint256 msgId);
+
 
     event MessageDeleted(bytes32 indexed messageHash, address indexed safe, address indexed proposer, uint256 msgId);
 
@@ -87,11 +87,7 @@ interface ISafeMessagePool {
      */
     function signMessage(bytes32 messageHash, bytes calldata signature) external;
 
-    /**
-     * @notice Mark a message as executed (keep in storage for history)
-     * @param messageHash Hash of the Safe message
-     */
-    function markMessageAsExecuted(bytes32 messageHash) external;
+
 
     /**
      * @notice Delete a pending message

@@ -124,41 +124,11 @@ contract SafeMessagePoolTest is Test {
         assertEq(pendingMessages[0], messageHash);
         assertEq(allMessages[0], messageHash);
 
-        // Mark as executed
-        vm.prank(safe);
-        registry.markMessageAsExecuted(messageHash);
-
-        // Verify message is removed from pending but stays in all messages
-        pendingMessages = registry.getPendingMessages(safe);
-        allMessages = registry.getAllMessages(safe);
-
-        assertEq(pendingMessages.length, 0); // Removed from pending
-        assertEq(allMessages.length, 1); // Still in history
-        assertEq(allMessages[0], messageHash);
+        // Messages stay in both pending and all messages until explicitly deleted
+        // There's no "execution" concept for messages - they're just signed
     }
 
-    function testMarkMessageAsExecuted() public {
-        // Propose a message
-        vm.prank(proposer);
-        registry.proposeMessage(messageHash, safe, testMessage, dAppTopic, dAppRequestId);
 
-        // Mark as executed (from Safe)
-        vm.prank(safe);
-        registry.markMessageAsExecuted(messageHash);
-
-        // Verify message was removed from pending
-        bytes32[] memory pendingMessages = registry.getPendingMessages(safe);
-        assertEq(pendingMessages.length, 0);
-
-        // Verify message details are NOT cleared (kept for history)
-        (address returnedSafe,,,,,) = registry.getMessageDetails(messageHash);
-        assertEq(returnedSafe, safe); // Should still be there
-
-        // Verify message is still in all messages (history)
-        bytes32[] memory allMessages = registry.getAllMessages(safe);
-        assertEq(allMessages.length, 1);
-        assertEq(allMessages[0], messageHash);
-    }
 
     function testDeleteMessage() public {
         // Propose a message
