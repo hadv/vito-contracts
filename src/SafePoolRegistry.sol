@@ -29,6 +29,9 @@ contract SafePoolRegistry is BaseGuard {
     // Events
     event SelfCallAllowed(address indexed safe, address indexed to);
     event GuardCallAllowed(address indexed safe, address indexed guard);
+    event FailedTransactionSkipped(bytes32 indexed txHash, address indexed safe);
+    event TransactionNotInPool(bytes32 indexed txHash, address indexed safe);
+    event MarkExecutionFailed(bytes32 indexed txHash, address indexed safe, bytes reason);
 
     // Errors
     error DelegateCallDisabled();
@@ -396,7 +399,7 @@ contract SafePoolRegistry is BaseGuard {
 
     /**
      * @notice Called by the Safe before a transaction is executed
-     * @dev We don't need to implement any pre-transaction checks for the registry
+     * @dev Validates transactions against address book and delegate call restrictions
      */
     function checkTransaction(
         address to,
@@ -411,8 +414,27 @@ contract SafePoolRegistry is BaseGuard {
         bytes memory signatures,
         address msgSender
     ) external view override {
-        // No pre-transaction checks needed for the registry
-        // This is just to satisfy the BaseGuard interface
+        address safe = msg.sender;
+
+        // Allow self-calls and guard calls
+        if (to == safe || to == address(this)) {
+            return;
+        }
+
+        // Check if address is in address book
+        if (!addressBookManager.hasAddressBookEntry(safe, to)) {
+            revert("Address not in address book");
+        }
+
+        // Check delegate call restrictions
+        if (operation == Enum.Operation.DelegateCall) {
+            if (!delegateCallManager.isDelegateCallEnabled(safe)) {
+                revert DelegateCallDisabled();
+            }
+            if (!delegateCallManager.isDelegateCallTargetAllowed(safe, to)) {
+                revert DelegateCallTargetNotAllowed();
+            }
+        }
     }
 
     /**
@@ -420,14 +442,18 @@ contract SafePoolRegistry is BaseGuard {
      * @dev Automatically marks the transaction as executed if it was successful
      */
     function checkAfterExecution(bytes32 txHash, bool success) external override {
-        // Only mark as executed if the transaction was successful
         if (success) {
             // Use try-catch to handle cases where the transaction might not exist in the pool
             try this.markAsExecuted(txHash) {
                 // Transaction successfully marked as executed
-            } catch {
-                // Transaction might not exist in pool or already executed - ignore
+            } catch (bytes memory) {
+                // Emit event for failed execution marking with empty bytes for compatibility
+                emit MarkExecutionFailed(txHash, msg.sender, "");
+                emit TransactionNotInPool(txHash, msg.sender);
             }
+        } else {
+            // Transaction failed, emit event
+            emit FailedTransactionSkipped(txHash, msg.sender);
         }
     }
 
