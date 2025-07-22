@@ -270,6 +270,13 @@ interface ISafeTxPoolCore {
     function getPendingMessages(address safe) external view returns (bytes32[] memory);
 
     /**
+     * @notice Get all message hashes for a Safe (including executed ones for history)
+     * @param safe The Safe wallet address
+     * @return Array of all message hashes
+     */
+    function getAllMessages(address safe) external view returns (bytes32[] memory);
+
+    /**
      * @notice Get signatures for a message
      * @param messageHash Hash of the Safe message
      * @return Array of signatures

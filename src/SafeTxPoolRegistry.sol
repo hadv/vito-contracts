@@ -420,6 +420,13 @@ contract SafeTxPoolRegistry is BaseGuard {
     }
 
     /**
+     * @notice Get all messages for a Safe (including executed ones for history)
+     */
+    function getAllMessages(address safe) external view returns (bytes32[] memory) {
+        return txPoolCore.getAllMessages(safe);
+    }
+
+    /**
      * @notice Get signatures for a message
      */
     function getMessageSignatures(bytes32 messageHash) external view returns (bytes[] memory) {

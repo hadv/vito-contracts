@@ -120,9 +120,14 @@ contract SafeMessagePoolTest is Test {
         bytes32[] memory pendingMessages = registry.getPendingMessages(safe);
         assertEq(pendingMessages.length, 0);
 
-        // Verify message details are cleared
-        (address returnedSafe,,,,, ) = registry.getMessageDetails(messageHash);
-        assertEq(returnedSafe, address(0)); // Should be cleared
+        // Verify message details are NOT cleared (kept for history)
+        (address returnedSafe,,,,,) = registry.getMessageDetails(messageHash);
+        assertEq(returnedSafe, safe); // Should still be there
+
+        // Verify message is still in all messages (history)
+        bytes32[] memory allMessages = registry.getAllMessages(safe);
+        assertEq(allMessages.length, 1);
+        assertEq(allMessages[0], messageHash);
     }
 
     function testDeleteMessage() public {
@@ -185,6 +190,33 @@ contract SafeMessagePoolTest is Test {
         assertEq(count, 2);
     }
 
+    function testGetAllMessages() public {
+        // Propose a message
+        vm.prank(proposer);
+        registry.proposeMessage(messageHash, safe, testMessage, dAppTopic, dAppRequestId);
+
+        // Verify message appears in both pending and all messages
+        bytes32[] memory pendingMessages = registry.getPendingMessages(safe);
+        bytes32[] memory allMessages = registry.getAllMessages(safe);
+
+        assertEq(pendingMessages.length, 1);
+        assertEq(allMessages.length, 1);
+        assertEq(pendingMessages[0], messageHash);
+        assertEq(allMessages[0], messageHash);
+
+        // Mark as executed
+        vm.prank(safe);
+        registry.markMessageAsExecuted(messageHash);
+
+        // Verify message is removed from pending but stays in all messages
+        pendingMessages = registry.getPendingMessages(safe);
+        allMessages = registry.getAllMessages(safe);
+
+        assertEq(pendingMessages.length, 0); // Removed from pending
+        assertEq(allMessages.length, 1); // Still in history
+        assertEq(allMessages[0], messageHash);
+    }
+
     function testMessageIsolationBetweenSafes() public {
         address safe2 = address(0x999);
         bytes32 messageHash2 = keccak256(abi.encodePacked(testMessage, safe2, block.chainid));
@@ -199,10 +231,16 @@ contract SafeMessagePoolTest is Test {
         // Verify each Safe only sees its own messages
         bytes32[] memory pendingMessages1 = registry.getPendingMessages(safe);
         bytes32[] memory pendingMessages2 = registry.getPendingMessages(safe2);
+        bytes32[] memory allMessages1 = registry.getAllMessages(safe);
+        bytes32[] memory allMessages2 = registry.getAllMessages(safe2);
 
         assertEq(pendingMessages1.length, 1);
         assertEq(pendingMessages2.length, 1);
+        assertEq(allMessages1.length, 1);
+        assertEq(allMessages2.length, 1);
         assertEq(pendingMessages1[0], messageHash);
         assertEq(pendingMessages2[0], messageHash2);
+        assertEq(allMessages1[0], messageHash);
+        assertEq(allMessages2[0], messageHash2);
     }
 }

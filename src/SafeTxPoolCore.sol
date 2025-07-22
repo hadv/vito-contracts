@@ -36,6 +36,9 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
     // Mapping from Safe address to array of pending message hashes
     mapping(address => bytes32[]) private pendingMessagesBySafe;
 
+    // Mapping from Safe address to array of all message hashes (for history)
+    mapping(address => bytes32[]) private allMessagesBySafe;
+
     /**
      * @notice Set the registry address (only callable once)
      * @param _registry The registry contract address
@@ -456,6 +459,9 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         // Add to pending messages for this Safe
         pendingMessagesBySafe[safe].push(messageHash);
 
+        // Add to all messages for this Safe (for history)
+        allMessagesBySafe[safe].push(messageHash);
+
         emit MessageProposed(messageHash, proposer, safe, message, msgId, dAppTopic, dAppRequestId);
     }
 
@@ -486,7 +492,7 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
     }
 
     /**
-     * @notice Mark a message as executed and remove from storage
+     * @notice Mark a message as executed (keep in storage for history)
      * @param messageHash Hash of the Safe message
      */
     function markMessageAsExecuted(bytes32 messageHash) external {
@@ -503,11 +509,11 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
         uint256 msgId = safeMessage.msgId;
         address safe = safeMessage.safe;
 
-        // Remove from pending messages for this Safe
+        // Remove from pending messages for this Safe (but keep message data for history)
         _removeMessageFromPending(safe, messageHash);
 
-        // Delete message data
-        delete messages[messageHash];
+        // NOTE: We do NOT delete message data - keep it for history/audit trail
+        // This is different from transactions which are removed after execution
 
         emit MessageExecuted(messageHash, safe, msgId);
     }
@@ -534,6 +540,9 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
 
         // Remove from pending messages for this Safe
         _removeMessageFromPending(safe, messageHash);
+
+        // Remove from all messages for this Safe
+        _removeMessageFromAll(safe, messageHash);
 
         // Delete message data
         delete messages[messageHash];
@@ -584,6 +593,15 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
     }
 
     /**
+     * @notice Get all message hashes for a Safe (including executed ones for history)
+     * @param safe The Safe wallet address
+     * @return Array of all message hashes
+     */
+    function getAllMessages(address safe) external view returns (bytes32[] memory) {
+        return allMessagesBySafe[safe];
+    }
+
+    /**
      * @notice Get signatures for a message
      * @param messageHash Hash of the Safe message
      * @return Array of signatures
@@ -626,6 +644,24 @@ contract SafeTxPoolCore is ISafeTxPoolCore {
                 // Move last element to current position and pop
                 pendingMessages[i] = pendingMessages[pendingMessages.length - 1];
                 pendingMessages.pop();
+                break;
+            }
+        }
+    }
+
+    /**
+     * @notice Remove a message from all messages list for a Safe
+     * @param safe The Safe wallet address
+     * @param messageHash Hash of the message to remove
+     */
+    function _removeMessageFromAll(address safe, bytes32 messageHash) internal {
+        bytes32[] storage allMessages = allMessagesBySafe[safe];
+
+        for (uint256 i = 0; i < allMessages.length; i++) {
+            if (allMessages[i] == messageHash) {
+                // Move last element to current position and pop
+                allMessages[i] = allMessages[allMessages.length - 1];
+                allMessages.pop();
                 break;
             }
         }
