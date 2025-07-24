@@ -74,17 +74,13 @@ ETHERSCAN_API_KEY=your_etherscan_api_key_for_verification
 
 ### Pre-deployment Checks
 
-Always run pre-commit checks before deployment:
+Pre-commit checks run automatically via Git hooks before each commit:
 
-```bash
-./scripts/pre-commit-check.sh
-```
-
-This ensures:
-- ✅ Code formatting is correct
 - ✅ All contracts build successfully
 - ✅ All tests pass (105/105)
 - ✅ Contract sizes are within limits
+
+The Git pre-commit hook ensures code quality automatically. If checks fail, the commit will be blocked until issues are resolved.
 
 ### Deployment Options
 
@@ -293,8 +289,8 @@ Error: some contracts exceed the runtime size limit (EIP-170: 24576 bytes)
 forge clean
 forge build
 
-# Check formatting
-forge fmt --check
+# Format code
+forge fmt
 ```
 
 #### 3. Test Failures
@@ -316,7 +312,7 @@ forge test --gas-report
 
 - **Documentation**: See [REFACTORING_GUIDE.md](REFACTORING_GUIDE.md) for detailed architecture information
 - **Issues**: Report bugs on [GitHub Issues](https://github.com/hadv/vito-contracts/issues)
-- **Testing**: Run `./scripts/pre-commit-check.sh` for comprehensive checks
+- **Testing**: Pre-commit hooks automatically run comprehensive checks before each commit
 
 ## Architecture
 

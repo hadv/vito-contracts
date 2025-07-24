@@ -171,31 +171,27 @@ All existing tests should pass without modification when using `SafeTxPoolRegist
 ## Development Workflow
 
 ### Pre-commit Checks
-Always run the pre-commit script before committing:
+Git pre-commit hooks automatically run before each commit:
 
-```bash
-./scripts/pre-commit-check.sh
-```
-
-This script will:
-- ✅ Check code formatting (`forge fmt --check`)
 - ✅ Build all contracts (`forge build`)
 - ✅ Run all tests (`forge test`)
 - ✅ Display contract sizes
+
+If any check fails, the commit will be blocked until issues are resolved.
 
 ### Manual Checks
 ```bash
 # Format code
 forge fmt
 
-# Check formatting
-forge fmt --check
-
 # Build with size info
 forge build --sizes
 
 # Run tests
 forge test
+
+# Run specific test with verbose output
+forge test --match-contract SafeTxPool -vvv
 ```
 
 ## Conclusion
