@@ -2,7 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafeMessagePool.sol";
+import "../src/SafePoolRegistry.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
@@ -22,9 +23,12 @@ contract TrustedContractExample is Script {
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
+        SafeMessagePool messagePool = new SafeMessagePool();
+
         // Deploy registry
-        SafeTxPoolRegistry pool = new SafeTxPoolRegistry(
+        SafePoolRegistry pool = new SafePoolRegistry(
             address(txPoolCore),
+            address(messagePool),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),
@@ -56,7 +60,7 @@ contract TrustedContractExample is Script {
         console.log("\n=== Adding Trusted Contracts ===");
 
         // Add trusted contracts with names
-        pool.addTrustedContract(safe, usdcToken, "USDC Token");
+        pool.addTrustedContract(safe, usdcToken, bytes32(bytes("USDC Token")));
         console.log("Added USDC Token as trusted contract");
 
         pool.addTrustedContract(safe, daiToken, "DAI Token");

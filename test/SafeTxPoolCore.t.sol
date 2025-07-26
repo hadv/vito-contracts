@@ -2,7 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/SafeTxPoolRegistry.sol";
+import "../src/SafeMessagePool.sol";
+import "../src/SafePoolRegistry.sol";
 import "../src/SafeTxPoolCore.sol";
 import "../src/AddressBookManager.sol";
 import "../src/DelegateCallManager.sol";
@@ -12,7 +13,7 @@ import "../src/interfaces/IAddressBookManager.sol";
 import "@safe-global/safe-contracts/contracts/common/Enum.sol";
 
 contract SafeTxPoolCoreTest is Test {
-    SafeTxPoolRegistry public registry;
+    SafePoolRegistry public registry;
     SafeTxPoolCore public txPoolCore;
 
     address public safe = address(0x1234);
@@ -37,8 +38,11 @@ contract SafeTxPoolCoreTest is Test {
         TransactionValidator transactionValidator =
             new TransactionValidator(address(addressBookManager), address(trustedContractManager));
 
-        registry = new SafeTxPoolRegistry(
+        SafeMessagePool messagePool = new SafeMessagePool();
+
+        registry = new SafePoolRegistry(
             address(txPoolCore),
+            address(messagePool),
             address(addressBookManager),
             address(delegateCallManager),
             address(trustedContractManager),
@@ -47,6 +51,7 @@ contract SafeTxPoolCoreTest is Test {
 
         // Set registry addresses for all components (one-time only)
         txPoolCore.setRegistry(address(registry));
+        messagePool.setRegistry(address(registry));
         addressBookManager.setRegistry(address(registry));
         delegateCallManager.setRegistry(address(registry));
         trustedContractManager.setRegistry(address(registry));
