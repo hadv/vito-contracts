@@ -44,6 +44,9 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     // Manager address for access control
     address public manager;
 
+    // Staked asset handler for DeFi protocols
+    address public stakedAssetHandler;
+
     // Global settings
     uint256 public minInactivityPeriod = MIN_INACTIVITY_PERIOD;
     uint256 public maxInactivityPeriod = MAX_INACTIVITY_PERIOD;
@@ -71,6 +74,14 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
 
     constructor(address _manager) {
         manager = _manager;
+    }
+
+    /**
+     * @notice Set the staked asset handler address
+     * @param _stakedAssetHandler Address of the staked asset handler
+     */
+    function setStakedAssetHandler(address _stakedAssetHandler) external onlyManager {
+        stakedAssetHandler = _stakedAssetHandler;
     }
 
     /**
@@ -193,7 +204,31 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     }
 
     /**
-     * @notice Execute inheritance for a beneficiary
+     * @notice Execute inheritance for a beneficiary including staked assets
+     */
+    function executeInheritanceWithStaking(
+        address safe,
+        address beneficiary,
+        AssetAllocation[] calldata assets,
+        bytes calldata oracleProof,
+        bytes calldata stakingData
+    ) external nonReentrant inheritanceActive(safe) notEmergencyStopped(safe) {
+        // Validate inheritance conditions
+        uint256 beneficiaryShare = _validateInheritanceExecution(safe, beneficiary, oracleProof);
+
+        // Handle staked assets first (simplified)
+        if (stakedAssetHandler != address(0) && stakingData.length > 0) {
+            _executeTransaction(safe, stakedAssetHandler, 0, stakingData, 0);
+        }
+
+        // Execute regular asset transfers
+        _executeAssetTransfers(safe, beneficiary, assets, beneficiaryShare);
+
+        emit InheritanceExecuted(safe, beneficiary, msg.sender);
+    }
+
+    /**
+     * @notice Execute inheritance for a beneficiary (original function for backward compatibility)
      */
     function executeInheritance(
         address safe,
@@ -201,28 +236,11 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         AssetAllocation[] calldata assets,
         bytes calldata oracleProof
     ) external nonReentrant inheritanceActive(safe) notEmergencyStopped(safe) {
-        InheritanceConfig storage config = inheritanceConfigs[safe];
-
-        // Check inactivity period
-        if (block.timestamp < config.lastActivity + config.inactivityPeriod) {
-            revert InactivityPeriodNotMet();
-        }
-
-        // Verify beneficiary exists and is active
-        uint256 index = beneficiaryIndex[safe][beneficiary];
-        if (index == 0) revert BeneficiaryNotFound();
-        index--; // Convert to array index
-
-        Beneficiary storage ben = beneficiaries[safe][index];
-        if (!ben.isActive) revert BeneficiaryNotFound();
-
-        // Oracle verification if required
-        if (config.requiresOracle) {
-            _verifyOracleProof(safe, beneficiary, oracleProof, config.oracleAddress);
-        }
+        // Validate inheritance conditions
+        uint256 beneficiaryShare = _validateInheritanceExecution(safe, beneficiary, oracleProof);
 
         // Execute asset transfers
-        _executeAssetTransfers(safe, beneficiary, assets, ben.share);
+        _executeAssetTransfers(safe, beneficiary, assets, beneficiaryShare);
 
         emit InheritanceExecuted(safe, beneficiary, msg.sender);
     }
@@ -317,6 +335,34 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     {
         bool success = ISafe(safe).execTransactionFromModule(to, value, data, operation);
         if (!success) revert TransferFailed();
+    }
+
+    function _validateInheritanceExecution(address safe, address beneficiary, bytes calldata oracleProof)
+        internal
+        view
+        returns (uint256 beneficiaryShare)
+    {
+        InheritanceConfig memory config = inheritanceConfigs[safe];
+
+        // Check inactivity period
+        if (block.timestamp < config.lastActivity + config.inactivityPeriod) {
+            revert InactivityPeriodNotMet();
+        }
+
+        // Verify beneficiary exists and is active
+        uint256 index = beneficiaryIndex[safe][beneficiary];
+        if (index == 0) revert BeneficiaryNotFound();
+        index--; // Convert to array index
+
+        Beneficiary memory ben = beneficiaries[safe][index];
+        if (!ben.isActive) revert BeneficiaryNotFound();
+
+        // Oracle verification if required
+        if (config.requiresOracle) {
+            _verifyOracleProof(safe, beneficiary, oracleProof, config.oracleAddress);
+        }
+
+        return ben.share;
     }
 
     // View Functions
