@@ -8,7 +8,7 @@ pragma solidity ^0.8.13;
  */
 interface IInheritanceModule {
     // Structs
-    
+
     /**
      * @notice Represents a beneficiary in the inheritance system
      * @param beneficiary Address of the beneficiary
@@ -64,18 +64,14 @@ interface IInheritanceModule {
     }
 
     // Events
-    
+
     /**
      * @notice Emitted when inheritance is configured for a Safe
      * @param safe Address of the Safe wallet
      * @param owner Address of the owner configuring inheritance
      * @param inactivityPeriod Inactivity period in seconds
      */
-    event InheritanceConfigured(
-        address indexed safe,
-        address indexed owner,
-        uint256 inactivityPeriod
-    );
+    event InheritanceConfigured(address indexed safe, address indexed owner, uint256 inactivityPeriod);
 
     /**
      * @notice Emitted when a beneficiary is added
@@ -83,21 +79,14 @@ interface IInheritanceModule {
      * @param beneficiary Address of the beneficiary
      * @param share Inheritance share in basis points
      */
-    event BeneficiaryAdded(
-        address indexed safe,
-        address indexed beneficiary,
-        uint256 share
-    );
+    event BeneficiaryAdded(address indexed safe, address indexed beneficiary, uint256 share);
 
     /**
      * @notice Emitted when a beneficiary is removed
      * @param safe Address of the Safe wallet
      * @param beneficiary Address of the beneficiary
      */
-    event BeneficiaryRemoved(
-        address indexed safe,
-        address indexed beneficiary
-    );
+    event BeneficiaryRemoved(address indexed safe, address indexed beneficiary);
 
     /**
      * @notice Emitted when beneficiary shares are updated
@@ -107,10 +96,7 @@ interface IInheritanceModule {
      * @param newShare New share
      */
     event BeneficiaryShareUpdated(
-        address indexed safe,
-        address indexed beneficiary,
-        uint256 oldShare,
-        uint256 newShare
+        address indexed safe, address indexed beneficiary, uint256 oldShare, uint256 newShare
     );
 
     /**
@@ -119,21 +105,14 @@ interface IInheritanceModule {
      * @param beneficiary Address of the beneficiary claiming inheritance
      * @param executor Address that executed the inheritance
      */
-    event InheritanceExecuted(
-        address indexed safe,
-        address indexed beneficiary,
-        address indexed executor
-    );
+    event InheritanceExecuted(address indexed safe, address indexed beneficiary, address indexed executor);
 
     /**
      * @notice Emitted when activity is recorded for a Safe
      * @param safe Address of the Safe wallet
      * @param timestamp Timestamp of the activity
      */
-    event ActivityRecorded(
-        address indexed safe,
-        uint256 timestamp
-    );
+    event ActivityRecorded(address indexed safe, uint256 timestamp);
 
     /**
      * @notice Emitted when inheritance configuration is updated
@@ -143,10 +122,7 @@ interface IInheritanceModule {
      * @param oracleAddress Address of the oracle
      */
     event InheritanceConfigUpdated(
-        address indexed safe,
-        uint256 inactivityPeriod,
-        bool requiresOracle,
-        address oracleAddress
+        address indexed safe, uint256 inactivityPeriod, bool requiresOracle, address oracleAddress
     );
 
     /**
@@ -154,13 +130,10 @@ interface IInheritanceModule {
      * @param safe Address of the Safe wallet
      * @param stopped Whether inheritance is stopped
      */
-    event EmergencyStopToggled(
-        address indexed safe,
-        bool stopped
-    );
+    event EmergencyStopToggled(address indexed safe, bool stopped);
 
     // Errors
-    
+
     error NotSafeOwner();
     error InheritanceNotActive();
     error InheritanceAlreadyActive();
@@ -180,7 +153,7 @@ interface IInheritanceModule {
     error InvalidCooldownPeriod();
 
     // Core Functions
-    
+
     /**
      * @notice Configure inheritance for a Safe wallet
      * @param safe Address of the Safe wallet
@@ -203,21 +176,14 @@ interface IInheritanceModule {
      * @param beneficiary Address of the beneficiary
      * @param share Inheritance share in basis points (10000 = 100%)
      */
-    function addBeneficiary(
-        address safe,
-        address beneficiary,
-        uint256 share
-    ) external;
+    function addBeneficiary(address safe, address beneficiary, uint256 share) external;
 
     /**
      * @notice Remove a beneficiary from the inheritance
      * @param safe Address of the Safe wallet
      * @param beneficiary Address of the beneficiary to remove
      */
-    function removeBeneficiary(
-        address safe,
-        address beneficiary
-    ) external;
+    function removeBeneficiary(address safe, address beneficiary) external;
 
     /**
      * @notice Update beneficiary share
@@ -225,11 +191,7 @@ interface IInheritanceModule {
      * @param beneficiary Address of the beneficiary
      * @param newShare New inheritance share in basis points
      */
-    function updateBeneficiaryShare(
-        address safe,
-        address beneficiary,
-        uint256 newShare
-    ) external;
+    function updateBeneficiaryShare(address safe, address beneficiary, uint256 newShare) external;
 
     /**
      * @notice Execute inheritance for a beneficiary
@@ -259,26 +221,20 @@ interface IInheritanceModule {
     function toggleEmergencyStop(address safe, bool stop) external;
 
     // View Functions
-    
+
     /**
      * @notice Get inheritance configuration for a Safe
      * @param safe Address of the Safe wallet
      * @return config Inheritance configuration
      */
-    function getInheritanceConfig(address safe) 
-        external 
-        view 
-        returns (InheritanceConfig memory config);
+    function getInheritanceConfig(address safe) external view returns (InheritanceConfig memory config);
 
     /**
      * @notice Get all beneficiaries for a Safe
      * @param safe Address of the Safe wallet
      * @return beneficiaries Array of beneficiaries
      */
-    function getBeneficiaries(address safe) 
-        external 
-        view 
-        returns (Beneficiary[] memory beneficiaries);
+    function getBeneficiaries(address safe) external view returns (Beneficiary[] memory beneficiaries);
 
     /**
      * @notice Check if inheritance can be executed for a beneficiary
@@ -287,9 +243,9 @@ interface IInheritanceModule {
      * @return canExecute Whether inheritance can be executed
      * @return reason Reason if inheritance cannot be executed
      */
-    function canExecuteInheritance(address safe, address beneficiary) 
-        external 
-        view 
+    function canExecuteInheritance(address safe, address beneficiary)
+        external
+        view
         returns (bool canExecute, string memory reason);
 
     /**
@@ -297,10 +253,7 @@ interface IInheritanceModule {
      * @param safe Address of the Safe wallet
      * @return timeRemaining Time in seconds until inheritance can be claimed
      */
-    function getTimeUntilInheritance(address safe) 
-        external 
-        view 
-        returns (uint256 timeRemaining);
+    function getTimeUntilInheritance(address safe) external view returns (uint256 timeRemaining);
 
     /**
      * @notice Check if an address is a beneficiary
@@ -309,8 +262,8 @@ interface IInheritanceModule {
      * @return isBeneficiary Whether the address is a beneficiary
      * @return share Inheritance share if beneficiary
      */
-    function isBeneficiary(address safe, address beneficiary) 
-        external 
-        view 
+    function isBeneficiary(address safe, address beneficiary)
+        external
+        view
         returns (bool isBeneficiary, uint256 share);
 }

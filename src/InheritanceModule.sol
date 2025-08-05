@@ -8,6 +8,16 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
+// Safe interface for module execution
+interface ISafe {
+    function execTransactionFromModule(address to, uint256 value, bytes memory data, uint8 operation)
+        external
+        returns (bool success);
+
+    function getOwners() external view returns (address[] memory);
+    function isOwner(address owner) external view returns (bool);
+}
+
 /**
  * @title InheritanceModule
  * @notice Safe wallet module for comprehensive inheritance functionality
@@ -23,28 +33,15 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     uint256 public constant MAX_INACTIVITY_PERIOD = 10 * 365 days; // 10 years
     uint256 public constant MIN_COOLDOWN_PERIOD = 7 days;
 
-    // Safe interface for module execution
-    interface ISafe {
-        function execTransactionFromModule(
-            address to,
-            uint256 value,
-            bytes memory data,
-            uint8 operation
-        ) external returns (bool success);
-        
-        function getOwners() external view returns (address[] memory);
-        function isOwner(address owner) external view returns (bool);
-    }
-
     // Storage
     mapping(address => InheritanceConfig) public inheritanceConfigs;
     mapping(address => Beneficiary[]) public beneficiaries;
     mapping(address => mapping(address => uint256)) public beneficiaryIndex;
     mapping(address => bool) public trustedOracles;
-    
+
     // Manager address for access control
     address public manager;
-    
+
     // Global settings
     uint256 public minInactivityPeriod = MIN_INACTIVITY_PERIOD;
     uint256 public maxInactivityPeriod = MAX_INACTIVITY_PERIOD;
@@ -95,7 +92,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         }
 
         InheritanceConfig storage config = inheritanceConfigs[safe];
-        
+
         // Check cooldown period for existing configurations
         if (config.isActive && block.timestamp < config.lastConfigChange + config.cooldownPeriod) {
             revert CooldownPeriodNotMet();
@@ -117,11 +114,11 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Add a beneficiary to the inheritance
      */
-    function addBeneficiary(
-        address safe,
-        address beneficiary,
-        uint256 share
-    ) external onlySafeOwner(safe) inheritanceActive(safe) {
+    function addBeneficiary(address safe, address beneficiary, uint256 share)
+        external
+        onlySafeOwner(safe)
+        inheritanceActive(safe)
+    {
         if (beneficiary == address(0) || beneficiary == safe) revert InvalidBeneficiary();
         if (share == 0 || share > MAX_SHARE) revert InvalidShare();
         if (beneficiaries[safe].length >= MAX_BENEFICIARIES) revert InvalidBeneficiary();
@@ -133,12 +130,9 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         uint256 totalShares = _getTotalShares(safe) + share;
         if (totalShares > MAX_SHARE) revert SharesExceedMaximum();
 
-        beneficiaries[safe].push(Beneficiary({
-            beneficiary: beneficiary,
-            share: share,
-            isActive: true,
-            addedAt: block.timestamp
-        }));
+        beneficiaries[safe].push(
+            Beneficiary({beneficiary: beneficiary, share: share, isActive: true, addedAt: block.timestamp})
+        );
 
         beneficiaryIndex[safe][beneficiary] = beneficiaries[safe].length;
 
@@ -148,10 +142,11 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Remove a beneficiary from the inheritance
      */
-    function removeBeneficiary(
-        address safe,
-        address beneficiary
-    ) external onlySafeOwner(safe) inheritanceActive(safe) {
+    function removeBeneficiary(address safe, address beneficiary)
+        external
+        onlySafeOwner(safe)
+        inheritanceActive(safe)
+    {
         uint256 index = beneficiaryIndex[safe][beneficiary];
         if (index == 0) revert BeneficiaryNotFound();
 
@@ -174,11 +169,11 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Update beneficiary share
      */
-    function updateBeneficiaryShare(
-        address safe,
-        address beneficiary,
-        uint256 newShare
-    ) external onlySafeOwner(safe) inheritanceActive(safe) {
+    function updateBeneficiaryShare(address safe, address beneficiary, uint256 newShare)
+        external
+        onlySafeOwner(safe)
+        inheritanceActive(safe)
+    {
         uint256 index = beneficiaryIndex[safe][beneficiary];
         if (index == 0) revert BeneficiaryNotFound();
         if (newShare == 0 || newShare > MAX_SHARE) revert InvalidShare();
@@ -205,7 +200,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         bytes calldata oracleProof
     ) external nonReentrant inheritanceActive(safe) notEmergencyStopped(safe) {
         InheritanceConfig storage config = inheritanceConfigs[safe];
-        
+
         // Check inactivity period
         if (block.timestamp < config.lastActivity + config.inactivityPeriod) {
             revert InactivityPeriodNotMet();
@@ -235,10 +230,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
      */
     function recordActivity(address safe) external {
         // Only Safe itself or its owners can record activity
-        require(
-            msg.sender == safe || ISafe(safe).isOwner(msg.sender),
-            "Unauthorized to record activity"
-        );
+        require(msg.sender == safe || ISafe(safe).isOwner(msg.sender), "Unauthorized to record activity");
 
         if (inheritanceConfigs[safe].isActive) {
             inheritanceConfigs[safe].lastActivity = block.timestamp;
@@ -249,10 +241,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Toggle emergency stop for inheritance
      */
-    function toggleEmergencyStop(
-        address safe,
-        bool stop
-    ) external onlySafeOwner(safe) inheritanceActive(safe) {
+    function toggleEmergencyStop(address safe, bool stop) external onlySafeOwner(safe) inheritanceActive(safe) {
         inheritanceConfigs[safe].emergencyStop = stop;
         emit EmergencyStopToggled(safe, stop);
     }
@@ -268,20 +257,18 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         }
     }
 
-    function _verifyOracleProof(
-        address safe,
-        address beneficiary,
-        bytes calldata proof,
-        address oracle
-    ) internal view {
+    function _verifyOracleProof(address safe, address beneficiary, bytes calldata proof, address oracle)
+        internal
+        view
+    {
         if (!trustedOracles[oracle]) revert InvalidOracle();
-        
+
         // Decode oracle signature
         if (proof.length != 65) revert OracleVerificationRequired();
-        
+
         bytes32 message = keccak256(abi.encodePacked(safe, beneficiary, block.timestamp / 1 days));
         bytes32 ethSignedMessage = message.toEthSignedMessageHash();
-        
+
         address signer = ethSignedMessage.recover(proof);
         if (signer != oracle) revert OracleVerificationRequired();
     }
@@ -296,28 +283,26 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
             AssetAllocation memory asset = assets[i];
             uint256 transferAmount;
 
-            if (asset.assetType == 0) { // ETH
+            if (asset.assetType == 0) {
+                // ETH
                 uint256 balance = safe.balance;
-                transferAmount = asset.isPercentage 
+                transferAmount = asset.isPercentage
                     ? (balance * asset.amount * beneficiaryShare) / (MAX_SHARE * MAX_SHARE)
                     : (asset.amount * beneficiaryShare) / MAX_SHARE;
-                
+
                 if (transferAmount > 0) {
                     _executeTransaction(safe, beneficiary, transferAmount, "", 0);
                 }
-            } else if (asset.assetType == 1) { // ERC20
+            } else if (asset.assetType == 1) {
+                // ERC20
                 IERC20 token = IERC20(asset.assetAddress);
                 uint256 balance = token.balanceOf(safe);
-                transferAmount = asset.isPercentage 
+                transferAmount = asset.isPercentage
                     ? (balance * asset.amount * beneficiaryShare) / (MAX_SHARE * MAX_SHARE)
                     : (asset.amount * beneficiaryShare) / MAX_SHARE;
-                
+
                 if (transferAmount > 0) {
-                    bytes memory data = abi.encodeWithSelector(
-                        token.transfer.selector,
-                        beneficiary,
-                        transferAmount
-                    );
+                    bytes memory data = abi.encodeWithSelector(token.transfer.selector, beneficiary, transferAmount);
                     _executeTransaction(safe, asset.assetAddress, 0, data, 0);
                 }
             }
@@ -325,13 +310,9 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
         }
     }
 
-    function _executeTransaction(
-        address safe,
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation
-    ) internal {
+    function _executeTransaction(address safe, address to, uint256 value, bytes memory data, uint8 operation)
+        internal
+    {
         bool success = ISafe(safe).execTransactionFromModule(to, value, data, operation);
         if (!success) revert TransferFailed();
     }
@@ -341,22 +322,14 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Get inheritance configuration for a Safe
      */
-    function getInheritanceConfig(address safe)
-        external
-        view
-        returns (InheritanceConfig memory config)
-    {
+    function getInheritanceConfig(address safe) external view returns (InheritanceConfig memory config) {
         return inheritanceConfigs[safe];
     }
 
     /**
      * @notice Get all beneficiaries for a Safe
      */
-    function getBeneficiaries(address safe)
-        external
-        view
-        returns (Beneficiary[] memory)
-    {
+    function getBeneficiaries(address safe) external view returns (Beneficiary[] memory) {
         return beneficiaries[safe];
     }
 
@@ -397,11 +370,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     /**
      * @notice Get time remaining until inheritance can be claimed
      */
-    function getTimeUntilInheritance(address safe)
-        external
-        view
-        returns (uint256 timeRemaining)
-    {
+    function getTimeUntilInheritance(address safe) external view returns (uint256 timeRemaining) {
         InheritanceConfig memory config = inheritanceConfigs[safe];
 
         if (!config.isActive) {

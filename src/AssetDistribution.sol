@@ -18,12 +18,13 @@ contract AssetDistribution is ReentrancyGuard {
 
     // Distribution patterns
     enum DistributionPattern {
-        EQUAL_SPLIT,        // Equal distribution among beneficiaries
-        WEIGHTED,           // Distribution based on predefined weights
-        CONDITIONAL,        // Distribution based on conditions
-        TIERED,            // Distribution in tiers/levels
-        VESTING,           // Time-based vesting distribution
-        CUSTOM             // Custom distribution logic
+        EQUAL_SPLIT, // Equal distribution among beneficiaries
+        WEIGHTED, // Distribution based on predefined weights
+        CONDITIONAL, // Distribution based on conditions
+        TIERED, // Distribution in tiers/levels
+        VESTING, // Time-based vesting distribution
+        CUSTOM // Custom distribution logic
+
     }
 
     // Asset types
@@ -37,11 +38,11 @@ contract AssetDistribution is ReentrancyGuard {
     // Distribution rule structure
     struct DistributionRule {
         DistributionPattern pattern;
-        uint256[] weights;          // For weighted distribution
-        uint256[] conditions;       // For conditional distribution
-        uint256 vestingPeriod;      // For vesting distribution
-        uint256 vestingCliff;       // Cliff period for vesting
-        bytes customLogic;          // For custom distribution
+        uint256[] weights; // For weighted distribution
+        uint256[] conditions; // For conditional distribution
+        uint256 vestingPeriod; // For vesting distribution
+        uint256 vestingCliff; // Cliff period for vesting
+        bytes customLogic; // For custom distribution
         bool isActive;
     }
 
@@ -72,32 +73,17 @@ contract AssetDistribution is ReentrancyGuard {
     mapping(address => mapping(address => uint256)) public releasableAmounts;
 
     // Events
-    event DistributionRuleSet(
-        address indexed safe,
-        address indexed beneficiary,
-        DistributionPattern pattern
-    );
-    
+    event DistributionRuleSet(address indexed safe, address indexed beneficiary, DistributionPattern pattern);
+
     event AssetDistributed(
-        address indexed safe,
-        address indexed beneficiary,
-        address indexed asset,
-        uint256 amount,
-        AssetType assetType
+        address indexed safe, address indexed beneficiary, address indexed asset, uint256 amount, AssetType assetType
     );
-    
+
     event VestingScheduleCreated(
-        address indexed safe,
-        address indexed beneficiary,
-        uint256 totalAmount,
-        uint256 duration
+        address indexed safe, address indexed beneficiary, uint256 totalAmount, uint256 duration
     );
-    
-    event TokensReleased(
-        address indexed safe,
-        address indexed beneficiary,
-        uint256 amount
-    );
+
+    event TokensReleased(address indexed safe, address indexed beneficiary, uint256 amount);
 
     // Errors
     error InvalidDistributionPattern();
@@ -131,7 +117,7 @@ contract AssetDistribution is ReentrancyGuard {
         if (pattern == DistributionPattern.WEIGHTED && weights.length == 0) {
             revert InvalidWeights();
         }
-        
+
         distributionRules[safe][beneficiary] = DistributionRule({
             pattern: pattern,
             weights: weights,
@@ -141,7 +127,7 @@ contract AssetDistribution is ReentrancyGuard {
             customLogic: customLogic,
             isActive: true
         });
-        
+
         emit DistributionRuleSet(safe, beneficiary, pattern);
     }
 
@@ -160,14 +146,18 @@ contract AssetDistribution is ReentrancyGuard {
     ) external nonReentrant {
         for (uint256 i = 0; i < assets.length; i++) {
             IInheritanceModule.AssetAllocation memory asset = assets[i];
-            
-            if (asset.assetType == 0) { // ETH
+
+            if (asset.assetType == 0) {
+                // ETH
                 _distributeETH(safe, beneficiaries, asset, totalShares);
-            } else if (asset.assetType == 1) { // ERC20
+            } else if (asset.assetType == 1) {
+                // ERC20
                 _distributeERC20(safe, beneficiaries, asset, totalShares);
-            } else if (asset.assetType == 2) { // ERC721
+            } else if (asset.assetType == 2) {
+                // ERC721
                 _distributeERC721(safe, beneficiaries, asset);
-            } else if (asset.assetType == 3) { // ERC1155
+            } else if (asset.assetType == 3) {
+                // ERC1155
                 _distributeERC1155(safe, beneficiaries, asset, totalShares);
             } else {
                 revert InvalidAssetType();
@@ -201,7 +191,7 @@ contract AssetDistribution is ReentrancyGuard {
             revocable: revocable,
             revoked: false
         });
-        
+
         emit VestingScheduleCreated(safe, beneficiary, totalAmount, duration);
     }
 
@@ -211,23 +201,19 @@ contract AssetDistribution is ReentrancyGuard {
      * @param beneficiary Address of the beneficiary
      * @param asset Asset to release
      */
-    function releaseVestedTokens(
-        address safe,
-        address beneficiary,
-        address asset
-    ) external nonReentrant {
+    function releaseVestedTokens(address safe, address beneficiary, address asset) external nonReentrant {
         VestingSchedule storage schedule = vestingSchedules[safe][beneficiary];
-        
+
         if (schedule.revoked) revert DistributionRevoked();
         if (block.timestamp < schedule.startTime + schedule.cliffDuration) {
             revert VestingNotStarted();
         }
-        
+
         uint256 releasableAmount = _calculateReleasableAmount(safe, beneficiary);
         if (releasableAmount == 0) revert InsufficientVestedAmount();
-        
+
         schedule.releasedAmount = schedule.releasedAmount.add(releasableAmount);
-        
+
         // Transfer tokens
         if (asset == address(0)) {
             // ETH transfer
@@ -236,7 +222,7 @@ contract AssetDistribution is ReentrancyGuard {
             // ERC20 transfer
             IERC20(asset).transfer(beneficiary, releasableAmount);
         }
-        
+
         emit TokensReleased(safe, beneficiary, releasableAmount);
     }
 
@@ -246,17 +232,18 @@ contract AssetDistribution is ReentrancyGuard {
      * @param beneficiaryCount Number of beneficiaries
      * @return amounts Array of distribution amounts
      */
-    function calculateEqualSplit(
-        uint256 totalAmount,
-        uint256 beneficiaryCount
-    ) public pure returns (uint256[] memory amounts) {
+    function calculateEqualSplit(uint256 totalAmount, uint256 beneficiaryCount)
+        public
+        pure
+        returns (uint256[] memory amounts)
+    {
         amounts = new uint256[](beneficiaryCount);
         uint256 amountPerBeneficiary = totalAmount.div(beneficiaryCount);
-        
+
         for (uint256 i = 0; i < beneficiaryCount; i++) {
             amounts[i] = amountPerBeneficiary;
         }
-        
+
         // Handle remainder
         uint256 remainder = totalAmount.mod(beneficiaryCount);
         if (remainder > 0) {
@@ -271,13 +258,13 @@ contract AssetDistribution is ReentrancyGuard {
      * @param totalWeight Total weight for normalization
      * @return amounts Array of distribution amounts
      */
-    function calculateWeightedDistribution(
-        uint256 totalAmount,
-        uint256[] memory weights,
-        uint256 totalWeight
-    ) public pure returns (uint256[] memory amounts) {
+    function calculateWeightedDistribution(uint256 totalAmount, uint256[] memory weights, uint256 totalWeight)
+        public
+        pure
+        returns (uint256[] memory amounts)
+    {
         amounts = new uint256[](weights.length);
-        
+
         for (uint256 i = 0; i < weights.length; i++) {
             amounts[i] = totalAmount.mul(weights[i]).div(totalWeight);
         }
@@ -290,13 +277,13 @@ contract AssetDistribution is ReentrancyGuard {
      * @param beneficiaryTiers Array mapping beneficiaries to tiers
      * @return amounts Array of distribution amounts
      */
-    function calculateTieredDistribution(
-        uint256 totalAmount,
-        uint256[] memory tiers,
-        uint256[] memory beneficiaryTiers
-    ) public pure returns (uint256[] memory amounts) {
+    function calculateTieredDistribution(uint256 totalAmount, uint256[] memory tiers, uint256[] memory beneficiaryTiers)
+        public
+        pure
+        returns (uint256[] memory amounts)
+    {
         amounts = new uint256[](beneficiaryTiers.length);
-        
+
         for (uint256 i = 0; i < beneficiaryTiers.length; i++) {
             uint256 tierIndex = beneficiaryTiers[i];
             if (tierIndex < tiers.length) {
@@ -319,19 +306,13 @@ contract AssetDistribution is ReentrancyGuard {
         } else {
             totalAmount = asset.amount;
         }
-        
+
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             address beneficiary = beneficiaries[i];
             DistributionRule memory rule = distributionRules[safe][beneficiary];
-            
-            uint256 amount = _calculateBeneficiaryAmount(
-                totalAmount,
-                rule,
-                i,
-                beneficiaries.length,
-                totalShares
-            );
-            
+
+            uint256 amount = _calculateBeneficiaryAmount(totalAmount, rule, i, beneficiaries.length, totalShares);
+
             if (amount > 0) {
                 payable(beneficiary).transfer(amount);
                 emit AssetDistributed(safe, beneficiary, address(0), amount, AssetType.ETH);
@@ -347,25 +328,19 @@ contract AssetDistribution is ReentrancyGuard {
     ) internal {
         IERC20 token = IERC20(asset.assetAddress);
         uint256 totalAmount = token.balanceOf(safe);
-        
+
         if (asset.isPercentage) {
             totalAmount = totalAmount.mul(asset.amount).div(10000);
         } else {
             totalAmount = asset.amount;
         }
-        
+
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             address beneficiary = beneficiaries[i];
             DistributionRule memory rule = distributionRules[safe][beneficiary];
-            
-            uint256 amount = _calculateBeneficiaryAmount(
-                totalAmount,
-                rule,
-                i,
-                beneficiaries.length,
-                totalShares
-            );
-            
+
+            uint256 amount = _calculateBeneficiaryAmount(totalAmount, rule, i, beneficiaries.length, totalShares);
+
             if (amount > 0) {
                 token.transferFrom(safe, beneficiary, amount);
                 emit AssetDistributed(safe, beneficiary, asset.assetAddress, amount, AssetType.ERC20);
@@ -379,12 +354,12 @@ contract AssetDistribution is ReentrancyGuard {
         IInheritanceModule.AssetAllocation memory asset
     ) internal {
         IERC721 nft = IERC721(asset.assetAddress);
-        
+
         // For NFTs, distribute to the first eligible beneficiary
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             address beneficiary = beneficiaries[i];
             DistributionRule memory rule = distributionRules[safe][beneficiary];
-            
+
             if (rule.isActive) {
                 nft.transferFrom(safe, beneficiary, asset.tokenId);
                 emit AssetDistributed(safe, beneficiary, asset.assetAddress, 1, AssetType.ERC721);
@@ -401,25 +376,19 @@ contract AssetDistribution is ReentrancyGuard {
     ) internal {
         IERC1155 token = IERC1155(asset.assetAddress);
         uint256 totalAmount = token.balanceOf(safe, asset.tokenId);
-        
+
         if (asset.isPercentage) {
             totalAmount = totalAmount.mul(asset.amount).div(10000);
         } else {
             totalAmount = asset.amount;
         }
-        
+
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             address beneficiary = beneficiaries[i];
             DistributionRule memory rule = distributionRules[safe][beneficiary];
-            
-            uint256 amount = _calculateBeneficiaryAmount(
-                totalAmount,
-                rule,
-                i,
-                beneficiaries.length,
-                totalShares
-            );
-            
+
+            uint256 amount = _calculateBeneficiaryAmount(totalAmount, rule, i, beneficiaries.length, totalShares);
+
             if (amount > 0) {
                 token.safeTransferFrom(safe, beneficiary, asset.tokenId, amount, "");
                 emit AssetDistributed(safe, beneficiary, asset.assetAddress, amount, AssetType.ERC1155);
@@ -435,7 +404,7 @@ contract AssetDistribution is ReentrancyGuard {
         uint256 totalShares
     ) internal pure returns (uint256) {
         if (!rule.isActive) return 0;
-        
+
         if (rule.pattern == DistributionPattern.EQUAL_SPLIT) {
             return totalAmount.div(totalBeneficiaries);
         } else if (rule.pattern == DistributionPattern.WEIGHTED) {
@@ -443,52 +412,37 @@ contract AssetDistribution is ReentrancyGuard {
                 return totalAmount.mul(rule.weights[beneficiaryIndex]).div(totalShares);
             }
         }
-        
+
         return 0;
     }
 
-    function _calculateReleasableAmount(
-        address safe,
-        address beneficiary
-    ) internal view returns (uint256) {
+    function _calculateReleasableAmount(address safe, address beneficiary) internal view returns (uint256) {
         VestingSchedule memory schedule = vestingSchedules[safe][beneficiary];
-        
+
         if (block.timestamp < schedule.startTime + schedule.cliffDuration) {
             return 0;
         }
-        
+
         uint256 elapsedTime = block.timestamp.sub(schedule.startTime);
         if (elapsedTime >= schedule.duration) {
             return schedule.totalAmount.sub(schedule.releasedAmount);
         }
-        
+
         uint256 vestedAmount = schedule.totalAmount.mul(elapsedTime).div(schedule.duration);
         return vestedAmount.sub(schedule.releasedAmount);
     }
 
     // View functions
 
-    function getDistributionRule(address safe, address beneficiary) 
-        external 
-        view 
-        returns (DistributionRule memory) 
-    {
+    function getDistributionRule(address safe, address beneficiary) external view returns (DistributionRule memory) {
         return distributionRules[safe][beneficiary];
     }
 
-    function getVestingSchedule(address safe, address beneficiary) 
-        external 
-        view 
-        returns (VestingSchedule memory) 
-    {
+    function getVestingSchedule(address safe, address beneficiary) external view returns (VestingSchedule memory) {
         return vestingSchedules[safe][beneficiary];
     }
 
-    function getReleasableAmount(address safe, address beneficiary) 
-        external 
-        view 
-        returns (uint256) 
-    {
+    function getReleasableAmount(address safe, address beneficiary) external view returns (uint256) {
         return _calculateReleasableAmount(safe, beneficiary);
     }
 }

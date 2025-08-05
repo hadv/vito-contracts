@@ -11,38 +11,28 @@ import "./IInheritanceModule.sol";
  */
 interface IInheritanceManager is IBaseManager {
     // Additional Events
-    
+
     /**
      * @notice Emitted when a new inheritance module is deployed
      * @param safe Address of the Safe wallet
      * @param module Address of the deployed inheritance module
      * @param owner Address of the Safe owner
      */
-    event InheritanceModuleDeployed(
-        address indexed safe,
-        address indexed module,
-        address indexed owner
-    );
+    event InheritanceModuleDeployed(address indexed safe, address indexed module, address indexed owner);
 
     /**
      * @notice Emitted when an inheritance module is enabled for a Safe
      * @param safe Address of the Safe wallet
      * @param module Address of the inheritance module
      */
-    event InheritanceModuleEnabled(
-        address indexed safe,
-        address indexed module
-    );
+    event InheritanceModuleEnabled(address indexed safe, address indexed module);
 
     /**
      * @notice Emitted when an inheritance module is disabled for a Safe
      * @param safe Address of the Safe wallet
      * @param module Address of the inheritance module
      */
-    event InheritanceModuleDisabled(
-        address indexed safe,
-        address indexed module
-    );
+    event InheritanceModuleDisabled(address indexed safe, address indexed module);
 
     /**
      * @notice Emitted when global inheritance settings are updated
@@ -51,13 +41,11 @@ interface IInheritanceManager is IBaseManager {
      * @param defaultCooldownPeriod Default cooldown period for configuration changes
      */
     event GlobalSettingsUpdated(
-        uint256 minInactivityPeriod,
-        uint256 maxInactivityPeriod,
-        uint256 defaultCooldownPeriod
+        uint256 minInactivityPeriod, uint256 maxInactivityPeriod, uint256 defaultCooldownPeriod
     );
 
     // Additional Errors
-    
+
     error ModuleAlreadyExists();
     error ModuleNotFound();
     error InvalidPeriodRange();
@@ -65,7 +53,7 @@ interface IInheritanceManager is IBaseManager {
     error InvalidModuleAddress();
 
     // Core Management Functions
-    
+
     /**
      * @notice Deploy and configure inheritance module for a Safe
      * @param safe Address of the Safe wallet
@@ -88,20 +76,14 @@ interface IInheritanceManager is IBaseManager {
      * @param safe Address of the Safe wallet
      * @param module Address of the inheritance module
      */
-    function enableInheritanceModule(
-        address safe,
-        address module
-    ) external;
+    function enableInheritanceModule(address safe, address module) external;
 
     /**
      * @notice Disable inheritance module for a Safe
      * @param safe Address of the Safe wallet
      * @param module Address of the inheritance module
      */
-    function disableInheritanceModule(
-        address safe,
-        address module
-    ) external;
+    function disableInheritanceModule(address safe, address module) external;
 
     /**
      * @notice Batch add beneficiaries to multiple Safes
@@ -130,7 +112,7 @@ interface IInheritanceManager is IBaseManager {
     ) external;
 
     // Oracle Management
-    
+
     /**
      * @notice Register a trusted oracle
      * @param oracle Address of the oracle
@@ -151,26 +133,20 @@ interface IInheritanceManager is IBaseManager {
     ) external;
 
     // View Functions
-    
+
     /**
      * @notice Get inheritance module address for a Safe
      * @param safe Address of the Safe wallet
      * @return module Address of the inheritance module
      */
-    function getInheritanceModule(address safe) 
-        external 
-        view 
-        returns (address module);
+    function getInheritanceModule(address safe) external view returns (address module);
 
     /**
      * @notice Check if an oracle is trusted
      * @param oracle Address of the oracle
      * @return isTrusted Whether the oracle is trusted
      */
-    function isTrustedOracle(address oracle) 
-        external 
-        view 
-        returns (bool isTrusted);
+    function isTrustedOracle(address oracle) external view returns (bool isTrusted);
 
     /**
      * @notice Get global inheritance settings
@@ -178,23 +154,16 @@ interface IInheritanceManager is IBaseManager {
      * @return maxInactivityPeriod Maximum allowed inactivity period
      * @return defaultCooldownPeriod Default cooldown period
      */
-    function getGlobalSettings() 
-        external 
-        view 
-        returns (
-            uint256 minInactivityPeriod,
-            uint256 maxInactivityPeriod,
-            uint256 defaultCooldownPeriod
-        );
+    function getGlobalSettings()
+        external
+        view
+        returns (uint256 minInactivityPeriod, uint256 maxInactivityPeriod, uint256 defaultCooldownPeriod);
 
     /**
      * @notice Get all Safes with inheritance configured
      * @return safes Array of Safe wallet addresses
      */
-    function getAllInheritanceSafes() 
-        external 
-        view 
-        returns (address[] memory safes);
+    function getAllInheritanceSafes() external view returns (address[] memory safes);
 
     /**
      * @notice Get inheritance statistics
@@ -202,12 +171,8 @@ interface IInheritanceManager is IBaseManager {
      * @return totalBeneficiaries Total number of beneficiaries across all Safes
      * @return totalExecutions Total number of inheritance executions
      */
-    function getInheritanceStats() 
-        external 
-        view 
-        returns (
-            uint256 totalSafes,
-            uint256 totalBeneficiaries,
-            uint256 totalExecutions
-        );
+    function getInheritanceStats()
+        external
+        view
+        returns (uint256 totalSafes, uint256 totalBeneficiaries, uint256 totalExecutions);
 }
