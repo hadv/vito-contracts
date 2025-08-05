@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Safe interface for module management
-interface ISafe {
+interface ISafeManager {
     function enableModule(address module) external;
     function disableModule(address prevModule, address module) external;
     function isModuleEnabled(address module) external view returns (bool);
@@ -50,7 +50,7 @@ contract InheritanceManager is BaseManager, IInheritanceManager, Ownable {
         _;
     }
 
-    constructor(address _inheritanceModuleTemplate) {
+    constructor(address _inheritanceModuleTemplate) Ownable(msg.sender) {
         inheritanceModuleTemplate = _inheritanceModuleTemplate;
     }
 
@@ -96,7 +96,7 @@ contract InheritanceManager is BaseManager, IInheritanceManager, Ownable {
     function enableInheritanceModule(address safe, address module) external onlySafeOrRegistry(safe) {
         if (safeToModule[safe] != module) revert ModuleNotFound();
 
-        ISafe(safe).enableModule(module);
+        ISafeManager(safe).enableModule(module);
         emit InheritanceModuleEnabled(safe, module);
     }
 
@@ -108,7 +108,7 @@ contract InheritanceManager is BaseManager, IInheritanceManager, Ownable {
 
         // Find previous module in the linked list
         address prevModule = _findPrevModule(safe, module);
-        ISafe(safe).disableModule(prevModule, module);
+        ISafeManager(safe).disableModule(prevModule, module);
 
         emit InheritanceModuleDisabled(safe, module);
     }
@@ -232,7 +232,7 @@ contract InheritanceManager is BaseManager, IInheritanceManager, Ownable {
      */
     function _findPrevModule(address safe, address module) internal view returns (address prevModule) {
         address SENTINEL_MODULES = address(0x1);
-        (address[] memory modules,) = ISafe(safe).getModulesPaginated(SENTINEL_MODULES, 100);
+        (address[] memory modules,) = ISafeManager(safe).getModulesPaginated(SENTINEL_MODULES, 100);
 
         prevModule = SENTINEL_MODULES;
         for (uint256 i = 0; i < modules.length; i++) {

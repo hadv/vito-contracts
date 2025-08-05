@@ -5,8 +5,9 @@ import "./interfaces/IInheritanceModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // Safe interface for module execution
 interface ISafe {
@@ -25,6 +26,7 @@ interface ISafe {
  */
 contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
 
     // Constants
     uint256 public constant MAX_BENEFICIARIES = 50;
@@ -392,7 +394,7 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     function isBeneficiary(address safe, address beneficiary)
         external
         view
-        returns (bool isBeneficiary, uint256 share)
+        returns (bool isValidBeneficiary, uint256 share)
     {
         uint256 index = beneficiaryIndex[safe][beneficiary];
         if (index == 0) {

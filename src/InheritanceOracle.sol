@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title InheritanceOracle
@@ -69,6 +69,8 @@ contract InheritanceOracle is Ownable, ReentrancyGuard {
     error InsufficientFee();
     error RequestNotFound();
     error AlreadyProcessed();
+
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @notice Request verification for inheritance conditions

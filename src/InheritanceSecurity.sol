@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /**
@@ -77,14 +77,14 @@ contract InheritanceSecurity is AccessControl, Pausable, ReentrancyGuard {
     event TimelockOperationExecuted(bytes32 indexed operationId);
 
     // Errors
-    error AddressBlacklisted();
+    error AddressIsBlacklisted();
     error NotWhitelisted();
     error RateLimitExceeded();
     error TransactionAlreadyExecuted();
     error InsufficientSignatures();
     error TimelockNotMet();
     error EmergencyStopActive();
-    error SuspiciousActivityDetected();
+    error SuspiciousActivityFound();
     error InvalidSecurityConfig();
 
     constructor() {
@@ -133,7 +133,7 @@ contract InheritanceSecurity is AccessControl, Pausable, ReentrancyGuard {
 
         // Check blacklist
         if (blacklistedAddresses[to] || blacklistedAddresses[msg.sender]) {
-            revert AddressBlacklisted();
+            revert AddressIsBlacklisted();
         }
 
         SecurityConfig memory config = safeSecurityConfigs[safe];

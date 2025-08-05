@@ -5,17 +5,14 @@ import "./interfaces/IInheritanceModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title AssetDistribution
  * @notice Advanced asset distribution logic for inheritance
  * @dev Supports multiple distribution patterns and asset types
  */
-contract AssetDistribution is ReentrancyGuard {
-    using SafeMath for uint256;
 
+contract AssetDistribution is ReentrancyGuard {
     // Distribution patterns
     enum DistributionPattern {
         EQUAL_SPLIT, // Equal distribution among beneficiaries
@@ -212,7 +209,7 @@ contract AssetDistribution is ReentrancyGuard {
         uint256 releasableAmount = _calculateReleasableAmount(safe, beneficiary);
         if (releasableAmount == 0) revert InsufficientVestedAmount();
 
-        schedule.releasedAmount = schedule.releasedAmount.add(releasableAmount);
+        schedule.releasedAmount = schedule.releasedAmount + releasableAmount;
 
         // Transfer tokens
         if (asset == address(0)) {
@@ -238,16 +235,16 @@ contract AssetDistribution is ReentrancyGuard {
         returns (uint256[] memory amounts)
     {
         amounts = new uint256[](beneficiaryCount);
-        uint256 amountPerBeneficiary = totalAmount.div(beneficiaryCount);
+        uint256 amountPerBeneficiary = totalAmount / beneficiaryCount;
 
         for (uint256 i = 0; i < beneficiaryCount; i++) {
             amounts[i] = amountPerBeneficiary;
         }
 
         // Handle remainder
-        uint256 remainder = totalAmount.mod(beneficiaryCount);
+        uint256 remainder = totalAmount % beneficiaryCount;
         if (remainder > 0) {
-            amounts[0] = amounts[0].add(remainder);
+            amounts[0] = amounts[0] + remainder;
         }
     }
 
@@ -266,7 +263,7 @@ contract AssetDistribution is ReentrancyGuard {
         amounts = new uint256[](weights.length);
 
         for (uint256 i = 0; i < weights.length; i++) {
-            amounts[i] = totalAmount.mul(weights[i]).div(totalWeight);
+            amounts[i] = (totalAmount * weights[i]) / totalWeight;
         }
     }
 
@@ -287,7 +284,7 @@ contract AssetDistribution is ReentrancyGuard {
         for (uint256 i = 0; i < beneficiaryTiers.length; i++) {
             uint256 tierIndex = beneficiaryTiers[i];
             if (tierIndex < tiers.length) {
-                amounts[i] = totalAmount.mul(tiers[tierIndex]).div(10000); // Basis points
+                amounts[i] = (totalAmount * tiers[tierIndex]) / 10000; // Basis points
             }
         }
     }
@@ -302,7 +299,7 @@ contract AssetDistribution is ReentrancyGuard {
     ) internal {
         uint256 totalAmount = safe.balance;
         if (asset.isPercentage) {
-            totalAmount = totalAmount.mul(asset.amount).div(10000);
+            totalAmount = (totalAmount * asset.amount) / 10000;
         } else {
             totalAmount = asset.amount;
         }
@@ -330,7 +327,7 @@ contract AssetDistribution is ReentrancyGuard {
         uint256 totalAmount = token.balanceOf(safe);
 
         if (asset.isPercentage) {
-            totalAmount = totalAmount.mul(asset.amount).div(10000);
+            totalAmount = (totalAmount * asset.amount) / 10000;
         } else {
             totalAmount = asset.amount;
         }
@@ -378,7 +375,7 @@ contract AssetDistribution is ReentrancyGuard {
         uint256 totalAmount = token.balanceOf(safe, asset.tokenId);
 
         if (asset.isPercentage) {
-            totalAmount = totalAmount.mul(asset.amount).div(10000);
+            totalAmount = (totalAmount * asset.amount) / 10000;
         } else {
             totalAmount = asset.amount;
         }
@@ -406,10 +403,10 @@ contract AssetDistribution is ReentrancyGuard {
         if (!rule.isActive) return 0;
 
         if (rule.pattern == DistributionPattern.EQUAL_SPLIT) {
-            return totalAmount.div(totalBeneficiaries);
+            return totalAmount / totalBeneficiaries;
         } else if (rule.pattern == DistributionPattern.WEIGHTED) {
             if (beneficiaryIndex < rule.weights.length) {
-                return totalAmount.mul(rule.weights[beneficiaryIndex]).div(totalShares);
+                return (totalAmount * rule.weights[beneficiaryIndex]) / totalShares;
             }
         }
 
@@ -423,13 +420,13 @@ contract AssetDistribution is ReentrancyGuard {
             return 0;
         }
 
-        uint256 elapsedTime = block.timestamp.sub(schedule.startTime);
+        uint256 elapsedTime = block.timestamp - schedule.startTime;
         if (elapsedTime >= schedule.duration) {
-            return schedule.totalAmount.sub(schedule.releasedAmount);
+            return schedule.totalAmount - schedule.releasedAmount;
         }
 
-        uint256 vestedAmount = schedule.totalAmount.mul(elapsedTime).div(schedule.duration);
-        return vestedAmount.sub(schedule.releasedAmount);
+        uint256 vestedAmount = (schedule.totalAmount * elapsedTime) / schedule.duration;
+        return vestedAmount - schedule.releasedAmount;
     }
 
     // View functions

@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "./interfaces/IInheritanceModule.sol";
 import "./InheritanceModule.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title InheritanceAutomation
@@ -67,6 +67,8 @@ contract InheritanceAutomation is Ownable, ReentrancyGuard {
     error KeeperNotActive();
     error InsufficientBond();
     error JobNotExecutable();
+
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @notice Create an automation job for inheritance execution
