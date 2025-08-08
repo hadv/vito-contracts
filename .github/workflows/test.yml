@@ -1,19 +1,16 @@
-name: CI
+name: Main CI
 
 on:
   push:
-  pull_request:
+    branches: [ main, develop ]
   workflow_dispatch:
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-
-    name: Foundry project
+  main-ci:
+    name: Main Branch Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +34,44 @@ jobs:
           forge build --sizes
         id: build
 
-      - name: Run Forge tests
+      - name: Run Tests
         run: |
+          echo "Running tests for main branch..."
+          # Main branch should contain stable, working contracts
+          # No conditional logic needed - just run what's available
           forge test -vvv
         id: test
+
+  deployment-check:
+    name: Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: main-ci
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Check Contract Sizes
+        run: |
+          forge build --sizes
+          echo "## Contract Sizes" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          forge build --sizes >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Deployment Artifacts
+        run: |
+          # Create deployment-ready artifacts
+          mkdir -p deployment/
+          cp -r out/ deployment/
+          echo "Deployment artifacts generated"
+
+      - name: Upload Deployment Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: deployment/
