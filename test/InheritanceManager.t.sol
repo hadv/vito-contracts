@@ -149,8 +149,9 @@ contract InheritanceManagerTest is Test {
         inheritanceManager.registerOracle(oracle, true);
 
         // Deploy without oracle requirement for now (oracle sync between manager and module is complex)
-        address module =
-            inheritanceManager.deployInheritanceModule(address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0));
+        address module = inheritanceManager.deployInheritanceModule(
+            address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
+        );
 
         assertNotEq(module, address(0));
 
