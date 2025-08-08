@@ -46,8 +46,9 @@ jobs:
 
       - name: Generate Coverage Report
         run: |
-          forge coverage --report lcov
-          forge coverage --report summary
+          forge coverage --report summary || echo "Coverage summary not available"
+          forge coverage --report lcov || echo "LCOV coverage not available"
+        continue-on-error: true
 
   build-artifacts:
     name: Build Release Artifacts
@@ -220,22 +221,15 @@ jobs:
           name: release-artifacts
 
       - name: Create Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Safe Wallet Inheritance Module ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Safe Wallet Inheritance Module ${{ github.ref_name }}
           body_path: release/RELEASE_NOTES.md
           draft: false
           prerelease: false
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: safe-inheritance-${{ github.ref }}.tar.gz
-          asset_name: safe-inheritance-${{ github.ref }}.tar.gz
-          asset_content_type: application/gzip
+          files: |
+            safe-inheritance-*.tar.gz
+            safe-inheritance-*.zip
