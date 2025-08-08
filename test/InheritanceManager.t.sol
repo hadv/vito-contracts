@@ -106,9 +106,11 @@ contract InheritanceManagerTest is Test {
     }
 
     function test_DeployInheritanceModule() public {
-        vm.prank(owner1);
-        vm.expectEmit(true, true, true, true);
-        emit InheritanceModuleDeployed(address(safe1), address(0), owner1);
+        // Calls must be made by the Safe or registry per onlySafeOrRegistry
+        vm.prank(address(safe1));
+        // Do not assert module address (unknown before call)
+        vm.expectEmit(true, false, true, true);
+        emit InheritanceModuleDeployed(address(safe1), address(0), address(safe1));
 
         address module = inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
@@ -120,13 +122,13 @@ contract InheritanceManagerTest is Test {
 
     function test_DeployInheritanceModule_AlreadyExists() public {
         // Deploy first module
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
 
         // Try to deploy second module for same safe
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         vm.expectRevert(abi.encodeWithSignature("ModuleAlreadyExists()"));
         inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
@@ -134,15 +136,9 @@ contract InheritanceManagerTest is Test {
     }
 
     function test_DeployInheritanceModule_InvalidPeriod() public {
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         vm.expectRevert(abi.encodeWithSignature("InvalidPeriodRange()"));
-        inheritanceManager.deployInheritanceModule(
-            address(safe1),
-            1 days, // Too short
-            COOLDOWN_PERIOD,
-            false,
-            address(0)
-        );
+        inheritanceManager.deployInheritanceModule(address(safe1), 1 days, COOLDOWN_PERIOD, false, address(0));
     }
 
     function test_DeployInheritanceModule_WithOracle() public {
@@ -157,26 +153,20 @@ contract InheritanceManagerTest is Test {
     }
 
     function test_DeployInheritanceModule_UnauthorizedOracle() public {
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         vm.expectRevert(abi.encodeWithSignature("UnauthorizedOracle()"));
-        inheritanceManager.deployInheritanceModule(
-            address(safe1),
-            INACTIVITY_PERIOD,
-            COOLDOWN_PERIOD,
-            true,
-            oracle // Not registered
-        );
+        inheritanceManager.deployInheritanceModule(address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, true, oracle);
     }
 
     function test_EnableInheritanceModule() public {
-        // Deploy module first
-        vm.prank(owner1);
+        // Deploy module first (call as Safe)
+        vm.prank(address(safe1));
         address module = inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
 
-        // Enable module
-        vm.prank(owner1);
+        // Enable module (call as Safe)
+        vm.prank(address(safe1));
         vm.expectEmit(true, true, false, true);
         emit InheritanceModuleEnabled(address(safe1), module);
 
@@ -188,36 +178,36 @@ contract InheritanceManagerTest is Test {
     function test_EnableInheritanceModule_ModuleNotFound() public {
         address fakeModule = makeAddr("fakeModule");
 
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         vm.expectRevert(abi.encodeWithSignature("ModuleNotFound()"));
         inheritanceManager.enableInheritanceModule(address(safe1), fakeModule);
     }
 
     function test_DisableInheritanceModule() public {
-        // Deploy and enable module first
-        vm.prank(owner1);
+        // Deploy and enable module first (call as Safe)
+        vm.prank(address(safe1));
         address module = inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
 
-        vm.prank(owner1);
+        vm.prank(address(safe1));
         inheritanceManager.enableInheritanceModule(address(safe1), module);
 
-        // Disable module
-        vm.prank(owner1);
+        // Disable module (call as Safe)
+        vm.prank(address(safe1));
         inheritanceManager.disableInheritanceModule(address(safe1), module);
 
         assertFalse(safe1.isModuleEnabled(module));
     }
 
     function test_BatchAddBeneficiaries() public {
-        // Deploy modules for both safes
-        vm.prank(owner1);
+        // Deploy modules for both safes (call as each Safe)
+        vm.prank(address(safe1));
         address module1 = inheritanceManager.deployInheritanceModule(
             address(safe1), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
 
-        vm.prank(owner2);
+        vm.prank(address(safe2));
         address module2 = inheritanceManager.deployInheritanceModule(
             address(safe2), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
@@ -252,7 +242,7 @@ contract InheritanceManagerTest is Test {
 
     function test_RegisterOracle_OnlyOwner() public {
         vm.prank(owner1);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", owner1));
         inheritanceManager.registerOracle(oracle, true);
     }
 

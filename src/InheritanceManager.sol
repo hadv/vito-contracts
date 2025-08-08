@@ -77,6 +77,9 @@ contract InheritanceManager is BaseManager, IInheritanceManager, Ownable {
         // Clone the template
         module = inheritanceModuleTemplate.clone();
 
+        // Initialize manager on the clone (constructor isn't called for clones)
+        InheritanceModule(module).initializeManager(address(this));
+
         // Store mapping
         safeToModule[safe] = module;
         inheritanceSafes.push(safe);

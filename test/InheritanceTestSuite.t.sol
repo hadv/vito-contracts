@@ -97,26 +97,27 @@ contract InheritanceTestSuite is Test {
     }
 
     function test_CompleteInheritanceFlow() public {
-        // Step 1: Deploy inheritance module through manager
-        vm.prank(owner);
+        // Step 1: Deploy inheritance module through manager (must be called by the Safe or registry)
+        vm.prank(address(safe));
         address module = inheritanceManager.deployInheritanceModule(
             address(safe), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
 
-        assertEq(module, address(inheritanceModule));
+        // The module should be a new clone, not the template address
+        assertNotEq(module, address(inheritanceModule));
 
-        // Step 2: Enable module on Safe
-        vm.prank(owner);
+        // Step 2: Enable module on Safe (must be called by the Safe or registry)
+        vm.prank(address(safe));
         inheritanceManager.enableInheritanceModule(address(safe), module);
 
         assertTrue(safe.modules(module));
 
-        // Step 3: Add beneficiaries
+        // Step 3: Add beneficiaries (use the cloned module, not the template)
         vm.prank(owner);
-        inheritanceModule.addBeneficiary(address(safe), beneficiary1, BENEFICIARY1_SHARE);
+        InheritanceModule(module).addBeneficiary(address(safe), beneficiary1, BENEFICIARY1_SHARE);
 
         vm.prank(owner);
-        inheritanceModule.addBeneficiary(address(safe), beneficiary2, BENEFICIARY2_SHARE);
+        InheritanceModule(module).addBeneficiary(address(safe), beneficiary2, BENEFICIARY2_SHARE);
 
         // Verify beneficiaries
         (bool isBen1, uint256 share1) = inheritanceModule.isBeneficiary(address(safe), beneficiary1);

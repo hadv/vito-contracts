@@ -58,7 +58,10 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
     }
 
     modifier onlySafeOwner(address safe) {
-        require(ISafe(safe).isOwner(msg.sender), "Not a Safe owner");
+        // Allow Safe owners or the authorized manager to perform configuration
+        if (msg.sender != manager && !ISafe(safe).isOwner(msg.sender)) {
+            revert("Not a Safe owner");
+        }
         _;
     }
 
@@ -74,6 +77,19 @@ contract InheritanceModule is IInheritanceModule, ReentrancyGuard {
 
     constructor(address _manager) {
         manager = _manager;
+    }
+
+    /**
+     * @notice Initialize the manager for a cloned module (EIP-1167 proxy doesn't run constructor)
+     */
+    function initializeManager(address _manager) external {
+        require(manager == address(0), "Manager already set");
+        require(_manager != address(0), "Invalid manager");
+        manager = _manager;
+        // Initialize default global settings for the clone
+        minInactivityPeriod = MIN_INACTIVITY_PERIOD;
+        maxInactivityPeriod = MAX_INACTIVITY_PERIOD;
+        defaultCooldownPeriod = MIN_COOLDOWN_PERIOD;
     }
 
     /**
