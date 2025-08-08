@@ -20,9 +20,15 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Show Forge version
+      - name: Show Forge version and debug info
         run: |
           forge --version
+          echo "Current directory: $(pwd)"
+          echo "Files in src/:"
+          ls -la src/ || echo "No src directory"
+          echo "Files in test/:"
+          ls -la test/ || echo "No test directory"
+          echo "Foundry profile: $FOUNDRY_PROFILE"
 
       - name: Run Forge fmt
         run: |
@@ -36,30 +42,43 @@ jobs:
 
       - name: Run All Tests (PR)
         run: |
-          # In PR context, check what contracts are available and run appropriate tests
           echo "Running comprehensive test suite for PR validation..."
 
-          # Check if inheritance contracts exist
-          if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
-            echo "Inheritance contracts found, running all tests..."
-            forge test -vvv
-          else
-            echo "Inheritance contracts not found, running core tests only..."
-            # Temporarily move inheritance test files to avoid compilation errors
-            mkdir -p temp_tests
+          # First, try to build to check for compilation issues
+          echo "Building contracts..."
+          if ! forge build; then
+            echo "Build failed, checking for inheritance contract issues..."
 
-            # Move specific inheritance test files
-            for file in test/InheritanceModule.t.sol test/InheritanceExecution.t.sol test/InheritanceManager.t.sol test/InheritanceTestSuite.t.sol test/StakedAssetHandler.t.sol; do
-              if [ -f "$file" ]; then
-                echo "Moving $file"
-                mv "$file" temp_tests/
-              fi
-            done
+            # Check if inheritance contracts exist
+            if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
+              echo "Inheritance contracts found but build failed. This shouldn't happen."
+              exit 1
+            else
+              echo "Inheritance contracts not found, moving inheritance test files..."
+              # Temporarily move inheritance test files to avoid compilation errors
+              mkdir -p temp_tests
 
-            # Run tests without inheritance files
-            forge test -vvv
+              # Move specific inheritance test files
+              for file in test/InheritanceModule.t.sol test/InheritanceExecution.t.sol test/InheritanceManager.t.sol test/InheritanceTestSuite.t.sol test/StakedAssetHandler.t.sol; do
+                if [ -f "$file" ]; then
+                  echo "Moving $file"
+                  mv "$file" temp_tests/
+                fi
+              done
 
-            # Restore inheritance test files
+              # Try building again
+              echo "Rebuilding without inheritance tests..."
+              forge build
+            fi
+          fi
+
+          # Now run tests
+          echo "Running tests..."
+          forge test -vvv
+
+          # Restore inheritance test files if they were moved
+          if [ -d "temp_tests" ]; then
+            echo "Restoring inheritance test files..."
             for file in temp_tests/*.t.sol; do
               if [ -f "$file" ]; then
                 mv "$file" test/
