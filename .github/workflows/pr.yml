@@ -43,61 +43,22 @@ jobs:
       - name: Run All Tests (PR)
         run: |
           echo "Running comprehensive test suite for PR validation..."
+          echo "PR should contain all necessary contracts and tests"
 
-          # First, try to build to check for compilation issues
+          # Build contracts
           echo "Building contracts..."
-          if ! forge build; then
-            echo "Build failed, checking for inheritance contract issues..."
+          forge build --sizes
 
-            # Check if inheritance contracts exist
-            if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
-              echo "Inheritance contracts found but build failed. This shouldn't happen."
-              exit 1
-            else
-              echo "Inheritance contracts not found, moving inheritance test files..."
-              # Temporarily move inheritance test files to avoid compilation errors
-              mkdir -p temp_tests
-
-              # Move specific inheritance test files
-              for file in test/InheritanceModule.t.sol test/InheritanceExecution.t.sol test/InheritanceManager.t.sol test/InheritanceTestSuite.t.sol test/StakedAssetHandler.t.sol; do
-                if [ -f "$file" ]; then
-                  echo "Moving $file"
-                  mv "$file" temp_tests/
-                fi
-              done
-
-              # Try building again
-              echo "Rebuilding without inheritance tests..."
-              forge build
-            fi
-          fi
-
-          # Now run tests
-          echo "Running tests..."
+          # Run all tests
+          echo "Running all tests..."
           forge test -vvv
-
-          # Restore inheritance test files if they were moved
-          if [ -d "temp_tests" ]; then
-            echo "Restoring inheritance test files..."
-            for file in temp_tests/*.t.sol; do
-              if [ -f "$file" ]; then
-                mv "$file" test/
-              fi
-            done
-            rmdir temp_tests 2>/dev/null || true
-          fi
         id: test
 
       - name: Generate Test Coverage
         run: |
-          # Generate coverage report only if inheritance contracts exist
-          if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
-            echo "Generating coverage for full test suite..."
-            forge coverage --report summary || echo "Coverage summary failed"
-            forge coverage --report lcov || echo "LCOV format not available, skipping"
-          else
-            echo "Skipping coverage for core-only tests"
-          fi
+          echo "Generating coverage for PR test suite..."
+          forge coverage --report summary || echo "Coverage summary failed"
+          forge coverage --report lcov || echo "LCOV format not available, skipping"
         id: coverage
         continue-on-error: true
 
@@ -159,42 +120,7 @@ jobs:
           name: gas-report
           path: gas-report.txt
 
-  inheritance-tests:
-    name: Inheritance Module Tests
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.title, 'inheritance') || contains(github.event.pull_request.body, 'inheritance')
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Check for Inheritance Contracts
-        run: |
-          if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
-            echo "INHERITANCE_AVAILABLE=true" >> $GITHUB_ENV
-          else
-            echo "INHERITANCE_AVAILABLE=false" >> $GITHUB_ENV
-          fi
-
-      - name: Run Inheritance-Specific Tests
-        if: env.INHERITANCE_AVAILABLE == 'true'
-        run: |
-          echo "Running inheritance module tests..."
-          forge test --match-path "test/Inheritance*.t.sol" -vvv
-
-      - name: Run Staked Asset Tests
-        if: env.INHERITANCE_AVAILABLE == 'true'
-        run: |
-          echo "Running staked asset handler tests..."
-          forge test --match-path "test/StakedAssetHandler.t.sol" -vvv
-
-      - name: Skip Inheritance Tests
-        if: env.INHERITANCE_AVAILABLE == 'false'
-        run: |
-          echo "Inheritance contracts not found, skipping inheritance-specific tests"
 
   documentation:
     name: Documentation Check
