@@ -10,9 +10,6 @@ env:
 
 jobs:
   main-ci:
-    strategy:
-      fail-fast: true
-
     name: Main Branch Validation
     runs-on: ubuntu-latest
     steps:
@@ -101,7 +98,7 @@ jobs:
           echo "Deployment artifacts generated"
 
       - name: Upload Deployment Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-artifacts
           path: deployment/
