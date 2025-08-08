@@ -87,6 +87,9 @@ contract InheritanceTestSuite is Test {
         inheritanceManager = new InheritanceManager(address(inheritanceModule));
         stakedAssetHandler = new StakedAssetHandler();
 
+        // Set the test contract as registry for the manager
+        inheritanceManager.setRegistry(address(this));
+
         // Fund the safe
         vm.deal(address(safe), 10 ether);
         token.mint(address(safe), 1000e18);
@@ -97,8 +100,7 @@ contract InheritanceTestSuite is Test {
     }
 
     function test_CompleteInheritanceFlow() public {
-        // Step 1: Deploy inheritance module through manager (must be called by the Safe or registry)
-        vm.prank(address(safe));
+        // Step 1: Deploy inheritance module through manager (call from registry)
         address module = inheritanceManager.deployInheritanceModule(
             address(safe), INACTIVITY_PERIOD, COOLDOWN_PERIOD, false, address(0)
         );
@@ -106,8 +108,7 @@ contract InheritanceTestSuite is Test {
         // The module should be a new clone, not the template address
         assertNotEq(module, address(inheritanceModule));
 
-        // Step 2: Enable module on Safe (must be called by the Safe or registry)
-        vm.prank(address(safe));
+        // Step 2: Enable module on Safe (call from registry)
         inheritanceManager.enableInheritanceModule(address(safe), module);
 
         assertTrue(safe.modules(module));
@@ -119,9 +120,9 @@ contract InheritanceTestSuite is Test {
         vm.prank(owner);
         InheritanceModule(module).addBeneficiary(address(safe), beneficiary2, BENEFICIARY2_SHARE);
 
-        // Verify beneficiaries
-        (bool isBen1, uint256 share1) = inheritanceModule.isBeneficiary(address(safe), beneficiary1);
-        (bool isBen2, uint256 share2) = inheritanceModule.isBeneficiary(address(safe), beneficiary2);
+        // Verify beneficiaries (use the cloned module)
+        (bool isBen1, uint256 share1) = InheritanceModule(module).isBeneficiary(address(safe), beneficiary1);
+        (bool isBen2, uint256 share2) = InheritanceModule(module).isBeneficiary(address(safe), beneficiary2);
 
         assertTrue(isBen1);
         assertTrue(isBen2);
@@ -154,7 +155,7 @@ contract InheritanceTestSuite is Test {
 
         uint256 initialBeneficiary1Balance = beneficiary1.balance;
 
-        inheritanceModule.executeInheritance(address(safe), beneficiary1, assets, "");
+        InheritanceModule(module).executeInheritance(address(safe), beneficiary1, assets, "");
 
         // Verify execution completed (in mock, actual transfers would happen)
         // The mock safe doesn't actually transfer, but the function should complete
