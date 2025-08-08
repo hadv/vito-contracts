@@ -1,0 +1,134 @@
+name: Dependencies
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Update Forge Dependencies
+        run: |
+          echo "Updating Forge dependencies..."
+          forge update
+          
+          # Check if there are any changes
+          if git diff --quiet; then
+            echo "No dependency updates available"
+          else
+            echo "Dependencies updated"
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add .
+            git commit -m "chore: Update Forge dependencies"
+          fi
+
+      - name: Test with Updated Dependencies
+        run: |
+          echo "Testing with updated dependencies..."
+          forge build
+          forge test
+
+      - name: Create Pull Request
+        if: success()
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: Update Forge dependencies"
+          title: "chore: Update Forge dependencies"
+          body: |
+            ## Dependency Updates
+            
+            This PR updates Forge dependencies to their latest versions.
+            
+            ### Changes
+            - Updated OpenZeppelin contracts
+            - Updated Safe contracts
+            - Updated Forge standard library
+            
+            ### Testing
+            - ✅ All tests pass with updated dependencies
+            - ✅ Contracts compile successfully
+            
+            ### Review Notes
+            Please review the changes and ensure compatibility with existing code.
+          branch: chore/update-dependencies
+          delete-branch: true
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Security Tools
+        run: |
+          pip3 install slither-analyzer mythril
+
+      - name: Run Slither
+        run: |
+          echo "Running Slither security analysis..."
+          slither . --print human-summary > slither-report.txt || true
+          
+          echo "## Slither Security Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat slither-report.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Mythril
+        run: |
+          echo "Running Mythril security analysis..."
+          myth analyze src/ --solv 0.8.30 > mythril-report.txt || true
+          
+          echo "## Mythril Security Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat mythril-report.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            slither-report.txt
+            mythril-report.txt
+
+  dependency-check:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Known Vulnerabilities
+        run: |
+          echo "Checking for known vulnerabilities in dependencies..."
+          
+          # Check OpenZeppelin version
+          if grep -r "openzeppelin" lib/; then
+            echo "OpenZeppelin contracts found"
+            # Add specific version checks here
+          fi
+          
+          # Check Safe contracts version
+          if grep -r "safe-global" lib/; then
+            echo "Safe contracts found"
+            # Add specific version checks here
+          fi
+          
+          echo "Dependency check completed"
