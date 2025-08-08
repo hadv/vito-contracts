@@ -34,39 +34,12 @@ jobs:
           forge build --sizes
         id: build
 
-      - name: Run Core Tests
+      - name: Run Tests
         run: |
-          # For main branch, run stable core tests
-          echo "Running core contract tests..."
-
-          # Check if inheritance contracts exist
-          if [ -f "src/InheritanceModule.sol" ] && [ -f "src/InheritanceManager.sol" ]; then
-            echo "Inheritance contracts found, running all tests..."
-            forge test -vvv
-          else
-            echo "Inheritance contracts not found, running core tests only..."
-            # Temporarily move inheritance test files to avoid compilation errors
-            mkdir -p temp_tests
-
-            # Move specific inheritance test files
-            for file in test/InheritanceModule.t.sol test/InheritanceExecution.t.sol test/InheritanceManager.t.sol test/InheritanceTestSuite.t.sol test/StakedAssetHandler.t.sol; do
-              if [ -f "$file" ]; then
-                echo "Moving $file"
-                mv "$file" temp_tests/
-              fi
-            done
-
-            # Run tests without inheritance files
-            forge test -vvv
-
-            # Restore inheritance test files
-            for file in temp_tests/*.t.sol; do
-              if [ -f "$file" ]; then
-                mv "$file" test/
-              fi
-            done
-            rmdir temp_tests 2>/dev/null || true
-          fi
+          echo "Running tests for main branch..."
+          # Main branch should contain stable, working contracts
+          # No conditional logic needed - just run what's available
+          forge test -vvv
         id: test
 
   deployment-check:
